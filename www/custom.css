@@ -1,0 +1,13 @@
+.skin-black .content-wrapper{
+ background-color: white;
+}
+
+.skin-black .main-header {
+  background-color: white;
+  text-align: left;
+}        
+
+/* Changing the width of the progress notifcation */
+#shiny-notification-panel{
+  width: 350px;
+}
