@@ -10,4 +10,21 @@
 /* Changing the width of the progress notifcation */
 #shiny-notification-panel{
   width: 350px;
+  background-color:#ff6262;
 }
+
+/*Changing the pill features so they look prettier*/
+.nav-pills>li.active>a, .nav-pills>li.active>a:focus, .nav-pills>li.active>a:hover {
+    border-top-color: #fdec96;
+    border-radius: 10px;
+    background-color: #fdec96;
+    color: #454545;
+}
+
+.nav-pills>li >a, .nav-pills>li>a:focus, .nav-pills>li>a:hover {
+    border-top-color: #dbd6d7;
+    border-radius: 10px;
+    background-color: #dbd6d7;
+    color: #000;
+}
+

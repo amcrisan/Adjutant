@@ -10,7 +10,7 @@ library(dbscan)
 library(ggplot2)
 library(stringr)
 library(tidyr)
-library(wordcloud)
+library(jsonlite)
 
 source("additionalFunctions.R")
 
@@ -21,6 +21,7 @@ demoVersion<-FALSE
 #Query String used to testing
 queryString<-'"mycobacterium tuberculosis "[All Fields] AND "genome"[All Fields] AND (("2016/01/01"[PDAT] : "2017/10/01"[PDAT]) AND English[lang]) AND (("2016/01/01"[PDAT] : "2017/10/01"[PDAT]) AND English[lang])'
 #queryString<-'"mycobacterium tuberculosis "[All Fields] AND (("2016/10/01"[PDAT] : "2017/10/01"[PDAT]) AND English[lang]) AND (("2016/01/01"[PDAT] : "2017/10/01"[PDAT]) AND English[lang])'
+#queryString<-'(("prostatic neoplasms"[MeSH Terms] OR ("prostatic"[All Fields] AND "neoplasms"[All Fields]) OR "prostatic neoplasms"[All Fields] OR ("prostate"[All Fields] AND "cancer"[All Fields]) OR "prostate cancer"[All Fields]) AND ("genomics"[MeSH Terms] OR "genomics"[All Fields])) AND ("2014/10/01"[PDAT] : "2014/12/01"[PDAT])'
 
 #function to update searchInput. Adapted from update awesomeCheckbox
 updateSearchInput <- function (session, inputId, value = NULL) {
@@ -45,21 +46,35 @@ shinyServer(function(input, output,session) {
     corpus = NULL,
     corpusTidy = NULL,
     subset = NULL,
-    tsneObj = NULL
+    tsneObj = NULL,
+    hoveredCluster=NULL
   )
 
-  #populating the dataset based upon searching
+  #populate the dataset based upon searching
   observeEvent(input$searchQuery_search,{
     df<-processSearch(input$searchQuery)
     values$corpus<-df
     values$totalDocs<-nrow(df)
-    saveRDS(df,file="temporaryStorage.RDS")
+    
+    if(!demoVersion){ 
+      savedFileName<-paste("./storedRuns/",format(Sys.time(), "%Y-%m-%d_%H-%M"), "_temporaryStorage.RDS", sep = "")
+      saveRDS(df,file=savedFileName)
+    }
+  })
+  
+  #populate the dataset based upon uploading previous file
+  observeEvent(input$prevAnalysis,{
+    if(!is.null(input$prevAnalysis)){
+      df<-readRDS(paste("./storedRuns/",input$prevAnalysis$name,sep=""))
+      values$corpus<-df
+      values$totalDocs<-nrow(df)
+    }
   })
   
   #update search string with example
   observeEvent(input$loadExample,{
     updateSearchInput(session,"searchQuery",value = queryString)
-  },ignoreInit = TRUE)
+  })
   
   #output some summary text of how many articles there are in a document
   output$summaryText<-renderUI({
@@ -89,10 +104,6 @@ shinyServer(function(input, output,session) {
   
   # Once the analysis button is clicked, autmatically go to that tab
   observeEvent(input$analyzeCorpus, {
-    #Update the tabset panel
-    updateTabsetPanel(session, "overviewPanel",
-                      selected = "Corpus Structure"
-    )
     
     # Only run the analysis *ONCE* per search
     # TO DO: Clear the values if a new analysis has begun
@@ -108,18 +119,28 @@ shinyServer(function(input, output,session) {
       #add the co-ordinate information to the main corpus document
       values$corpus<-inner_join(values$corpus,tsneObj$Y,by="PMID")
       
+      #save the tsne object too, it helps a tad with the debugged
+      savedFileName<-paste("./storedRuns/", "TSNE_temporaryStorage.RDS", sep = "")
+      saveRDS(values$corpus,file=savedFileName)
+      
       #get the clusters for the tsne perplexity 100 plot using HDBSCAN
-      tmp <- values$corpus %>%
-        select(contains("tsneComp")) %>%
-        as.matrix()
+      optClusters <- optimalParam(values$corpus) #still working on this
+      values$corpus<-inner_join(values$corpus,optClusters,by="PMID")
       
-      cl<-hdbscan(tmp, minPts = 50) #minimum cluster size of 150 documents
+      #give names to the cluster points
+      clustNames<-values$corpus %>%
+        group_by(tsneCluster)%>%
+        mutate(tsneClusterNames = getTopTerms(clustPMID = PMID,clustValue=tsneCluster,topNVal = 2,tidyCorpus=tidyCorpus_df)) %>%
+        select(PMID,tsneClusterNames)
       
-      #quick scan to find optimal parameters for the cluster
-      
-      values$corpus$tsneCluster<-cl$cluster
-      
+      values$corpus<-inner_join(values$corpus,clustNames,by="PMID")
       #corpus<-inner_join(corpus,tsneObj$Y,by="PMID")
+      
+      #Update the tabset panel
+      updateTabsetPanel(session, "overviewPanel",
+                        selected = "Corpus Structure"
+      )
+      
     }
   })
   
@@ -135,17 +156,54 @@ shinyServer(function(input, output,session) {
     fixedHeader=TRUE
   ))
   
+  #Explore box output once analysis has been run
+  output$exploreBox<-renderUI({
+    if(!is.null(values$tsneObj)){
+      shinydashboard::box(title="Explore Clusters",
+        solidHeader = TRUE,
+        collapsible = FALSE,
+        width=NULL,#column layout
+        computeClustSummary(values$corpus,input$plot_hover)
+      )
+    }else{
+      NULL
+    }
+  })
+  
   # VISUALIZATIONS
   
   #Plot the tSNE result
   output$tsnePlot<-renderPlot({
     if(!is.null(values$tsneObj)){
-      ggplot(values$corpus,aes(x=tsneComp1,y=tsneComp2,group=tsneCluster))+
-        geom_point(alpha=0.5,size=2)+
+      
+      df<-values$corpus
+      
+      #seperate data object for cluster names
+      clusterNames <- df %>%
+        group_by(tsneClusterNames) %>%
+        summarise(medX = median(tsneComp1),
+                  medY = median(tsneComp2)) %>%
+        filter(tsneClusterNames != "Noise")
+      
+      #draw the tsne graph
+      p<-df %>%
+      mutate(isNoise = ifelse(tsneCluster.x==0,"Noise","Signal"))%>% 
+      ggplot(aes(x=tsneComp1,y=tsneComp2,group=tsneClusterNames))+
+        geom_point(aes(colour=isNoise,alpha=isNoise))+
+        stat_ellipse(col="red",aes(size=isNoise))+
         ylab("tsne comp. 2")+
         xlab("tsne comp. 1")+
-        stat_ellipse(col="red")+
-        theme_bw()
+        scale_size_manual(values=c(0,1))+
+        scale_alpha_manual(values=c(0.2,0.5))+
+        scale_colour_manual(values=c("#ade6e6","black"))+
+        theme_bw()+
+        theme(legend.position = "bottom")
+      
+      if(input$showName){
+        p<-p+geom_label(data=clusterNames,aes(x=medX,y=medY,label=tsneClusterNames),col="blue",size=3,check_overlap=TRUE,fontface="bold")
+      }
+      
+      p
     }else{
       NULL
     }
