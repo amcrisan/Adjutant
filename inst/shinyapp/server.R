@@ -13,14 +13,18 @@ library(tidyr)
 library(scales)
 library(jsonlite)
 
-source("additionalFunctions.R") #additional analytic functions
+#additional analytic functions
+source("../../R/process_pubmed.R")
+source("../../R/tidy_corpus.R")
+source("../../R/cluster_corpus.R")
+source("../../R/explore_clusters.R")
 
-#set.seed(416) #repping the 6ix! 
+set.seed(416) #repping the 6ix! 
 
 #a variable that changes up some parameters depending on whether this is the demo version of the app or not
 demoVersion<-FALSE
   
-#Query String used to testing
+#Query Strings used for testing testing - I use a couple of example here
 #queryString<-'"mycobacterium tuberculosis "[All Fields] AND "genome"[All Fields] AND (("2016/01/01"[PDAT] : "2017/10/01"[PDAT]) AND English[lang]) AND (("2016/01/01"[PDAT] : "2017/10/01"[PDAT]) AND English[lang])'
 #queryString<-'"mycobacterium tuberculosis "[All Fields] AND (("2016/10/01"[PDAT] : "2017/10/01"[PDAT]) AND English[lang]) AND (("2016/01/01"[PDAT] : "2017/10/01"[PDAT]) AND English[lang])'
 #queryString<-'(("prostatic neoplasms"[MeSH Terms] OR ("prostatic"[All Fields] AND "neoplasms"[All Fields]) OR "prostatic neoplasms"[All Fields] OR ("prostate"[All Fields] AND "cancer"[All Fields]) OR "prostate cancer"[All Fields]) AND ("genomics"[MeSH Terms] OR "genomics"[All Fields])) AND ("2014/10/01"[PDAT] : "2014/12/01"[PDAT])'
@@ -49,48 +53,90 @@ shinyServer(function(input, output,session) {
   #Storage of reactive dataset values
   values<-reactiveValues(
     totalDocs = 0,
-    corpus = NULL,
-    corpusTidy = NULL,
+    corpus = NULL, #original document corpus 
+    corpusTidy = NULL, # tidyText version of corpus
     subset = NULL,
     tsneObj = NULL,
-    hoveredCluster=NULL
+    hoveredCluster= NULL,
+    analysisProgress = FALSE
   )
 
-  #populate the dataset based upon searching
-  observeEvent(input$searchQuery_search,{
-    df<-processSearch(input$searchQuery,demoVersion)
-    values$corpus<-df
-    values$totalDocs<-nrow(df)
-    
-    if(!demoVersion){ 
-      savedFileName<-paste("./storedRuns/",format(Sys.time(), "%Y-%m-%d_%H-%M"), "_temporaryStorage.RDS", sep = "")
-      saveRDS(df,file=savedFileName)
-    }
-  })
+  ##########################################
+  # Events to support loading of dataset
+  #
+  # Two loading options: Search pubmed or load prior run
   
-  #populate the dataset based upon uploading previous file
-  observeEvent(input$prevAnalysis,{
-    if(!is.null(input$prevAnalysis)){
-      df<-readRDS(paste("./storedRuns/",input$prevAnalysis$name,sep=""))
-      values$corpus<-df
-      values$totalDocs<-nrow(df)
-    }
-  })
   
-  #update search string with example
+  # OPTION 1: USER SEARCHES PUBMED
+  # once people click to search pubmed, do and store the data in 'values' variable
+  
+  # User can load example query string to observe functionality.
+  # Example text loaded into search textbox
   observeEvent(input$loadExample,{
     updateSearchInput(session,"searchQuery",value = queryString)
   })
   
+  # Observe is 'search' button is pushed to initate pubmed query
+  observeEvent(input$searchQuery_search,{
+    if(!values$analysisProgress){
+      
+       withProgress(message = 'Querying Pubmed', value = 0, {
+        df<-processSearch(input$searchQuery,demoVersion) #search pubmed
+       })
+      
+      values$corpus<-df #save corpus
+      values$totalDocs<-nrow(df) #save total # of documents
+      values$analysisProgress<-TRUE #indicate an analysis is now in progress
+      
+      #save file in storedRuns, unless demo (shinyapps.io) version is running
+      if(!demoVersion){ 
+        savedFileName<-paste("./storedRuns/",format(Sys.time(), "%Y-%m-%d_%H-%M"), "_temporaryStorage.RDS", sep = "")
+        saveRDS(df,file=savedFileName)
+      }
+    }else{
+      print("Please clear previous analysis before starting a new one")
+    }
+  })
+  
+  # OPTION 2: Users load PREVIOUS data
+  # populate the dataset based upon uploading previous file
+  observeEvent(input$prevAnalysis,{
+    if(!values$analysisProgress){
+      
+      if(!is.null(input$prevAnalysis)){
+        
+        df<-readRDS(paste("./storedRuns/",input$prevAnalysis$name,sep=""))
+        values$corpus<-df
+        values$totalDocs<-nrow(df)
+        values$analysisProgress <-TRUE
+        
+      }
+      
+    }else{
+      print("Please clear previous analysis before starting a new one")
+    }
+  })
+  
+  
+  ##########################################
+  # Summaries of loaded dataset
+  #
+  # Populate the Search results tab with a summary message
+  # and table of the search results. Enable the user to initate 
+  # the clustering analysis
+  
   #output some summary text of how many articles there are in a document
   output$summaryText<-renderUI({
+    
     if(!is.null(values$corpus)){
      HTML(sprintf('<p>There are currently <strong>%d</strong> articles in the document corpus</p>',values$totalDocs))
     }else{
       NULL
     }
+    
   })
   
+  # text that user clicks on to begin downstream clustering analysis
   output$analysisButton <-
     renderUI(expr = if (!is.null(values$corpus)) {
       actionLink("analyzeCorpus","Click here to generate an automatic overview of the document corpus")
@@ -100,53 +146,89 @@ shinyServer(function(input, output,session) {
   
   #output some summary text of how many articles there are in a document
   output$summaryTextAnalysis<-renderUI({
+    
     if(!is.null(values$tsneObj)){
       HTML("<br> <strong>Here are your results!</strong>. Have a lot of fun exploring")
     }else{
       HTML("<br> <strong>Nothing here yet!</strong> Enter a query to generate a document corpus and then select the option to start the analysis in the <em>'Search Results'</em> tab")
     }
+    
   })
   
+  # A data table containing the document corpus
+  output$documentTable <- DT::renderDataTable({
+    
+    if(!is.null(values$corpus)){
+      values$corpus %>%
+        select(-contains("meshTerms"), -contains("Abstract"))
+    }
+    
+  },server=TRUE,extensions = c('Responsive','Buttons','FixedHeader'), options = list(
+    dom = 'Bfrtip',
+    buttons = c('copy', 'csv', 'excel'),
+    fixedHeader=TRUE
+  ))
+  
+  
+  ##########################################
+  # Cluster Analysis of document corpus
   
   # Once the analysis button is clicked, autmatically go to that tab
   observeEvent(input$analyzeCorpus, {
     
-    # Only run the analysis *ONCE* per search
-    # TO DO: Clear the values if a new analysis has begun
     if(is.null(values$tsneObj)){
-      #run the actual analysis, getting the tSNE object!
-      tidyCorpus_df<-tidyCorpus(values$corpus) #some documents are dropped here
-      tsneObj<-runTSNE(tidyCorpus_df,check_duplicates=FALSE)
       
-      #add these data objects to the running register
-      values$corpusTidy<-tidyCorpus_df
-      values$tsneObj<-tsneObj
-      
-      #add the co-ordinate information to the main corpus document
+      # convert to document corpus to tidy text format
+      withProgress(message = 'Making corpus tidy', 
+                   detail = "\n Cleaning up the text data, removing stop words, calcuting td_idf metric, removing very common words", value = 0, {
+        
+        incProgress(amount = 0.2) #doesn't do much but visually pacifying
+                     
+        tidyCorpus_df<-tidyCorpus(values$corpus)
+        values$corpusTidy<-tidyCorpus_df
+      })
+      #run tSNE the tidy corpus (note the runTSNE fuction 
+      # will turn the tidy corpus into a document term matrix)
+      withProgress(message = 'Dimensionality Reduction',
+                   detail = "Running tsne on tidy corpus document term matrix",value = 0, {
+                     
+        incProgress(amount = 0.2) #doesn't do much but visually pacifying
+                     
+        tsneObj<-runTSNE(tidyCorpus_df,check_duplicates=FALSE)
+        values$tsneObj<-tsneObj
+      })
+  
+      #update document corpus with tsne info
       values$corpus<-inner_join(values$corpus,tsneObj$Y,by="PMID")
       
-      #get the clusters for the tsne perplexity 100 plot using HDBSCAN
-      optClusters <- optimalParam(values$corpus) #still working on this
-      print(colnames(optClusters))
-      values$corpus<-inner_join(values$corpus,optClusters,by="PMID")
+      #Using HDBSCAN, identify that optimal parameters for generating clusters
+      withProgress(message = 'Clustering Corpus ', 
+                   detail="Running HDBSCAN and finding optimal number of cluster", value = 0, {
+        optClusters <- optimalParam(values$corpus)
+        values$corpus<-inner_join(values$corpus,optClusters,by="PMID")
+      })
       
-      #give names to the cluster points
-      clustNames<-values$corpus %>%
-        group_by(tsneCluster)%>%
-        mutate(tsneClusterNames = getTopTerms(clustPMID = PMID,clustValue=tsneCluster,topNVal = 2,tidyCorpus=tidyCorpus_df)) %>%
-        select(PMID,tsneClusterNames) %>%
-        ungroup()
+      #name clusters according to top-two terms appear in cluster
+      withProgress(message = "Namiing Clusters",
+                   detail= "Data are now clustered and are being assigned names to make it easier to navigate", value = 0, {
+        clustNames<-values$corpus %>%
+          group_by(tsneCluster)%>%
+          mutate(tsneClusterNames = getTopTerms(clustPMID = PMID,clustValue=tsneCluster,topNVal = 2,tidyCorpus=tidyCorpus_df)) %>%
+          select(PMID,tsneClusterNames) %>%
+          ungroup()
+        
+        #update document corpus with cluster names
+        values$corpus<-inner_join(values$corpus,clustNames,by=c("PMID","tsneCluster"))
+      })
       
       
+      #if not the demo version, save the tsne, cluster object for further analysis
+      if(!(demoVersion)){
+        savedFileName<-paste("./storedRuns/", "TSNE_temporaryStorage.RDS", sep = "")
+        saveRDS(values$corpus,file=savedFileName)
+      }
       
-      values$corpus<-inner_join(values$corpus,clustNames,by=c("PMID","tsneCluster"))
-      #corpus<-inner_join(corpus,tsneObj$Y,by="PMID")
-      
-      #save the tsne object too, it helps a tad with the debugged
-      savedFileName<-paste("./storedRuns/", "TSNE_temporaryStorage.RDS", sep = "")
-      saveRDS(values$corpus,file=savedFileName)
-      
-      #Update the tabset panel
+      #Update the tabset panel to corpus view
       updateTabsetPanel(session, "overviewPanel",
                         selected = "Corpus Structure"
       )
@@ -161,19 +243,13 @@ shinyServer(function(input, output,session) {
     }
   })
   
-  # Documents within a selected cluster
-  output$documentTable <- DT::renderDataTable({
-    if(!is.null(values$corpus)){
-      values$corpus %>%
-        select(-contains("meshTerms"), -contains("Abstract"))
-    }
-  },server=TRUE,extensions = c('Responsive','Buttons','FixedHeader'), options = list(
-    dom = 'Bfrtip',
-    buttons = c('copy', 'csv', 'excel'),
-    fixedHeader=TRUE
-  ))
-  
-  #Explore box output once analysis has been run
+
+  # In the cluster tab, and when the user brushes
+  # over points in the tsnePlot, populate a 
+  # box with some information about the cluster.
+  # That informaiton is: the name of the cluster,
+  # the top-ten most frequently occuring words
+  # and the 5 most cited papers (according to pubmed PMC)
   output$exploreBox<-renderUI({
     if(!is.null(values$tsneObj)){
       shinydashboard::box(title="Explore Clusters",
@@ -188,7 +264,8 @@ shinyServer(function(input, output,session) {
     }
   })
   
-  # VISUALIZATIONS
+  ##########################################
+  # Visualizations
   
   #Plot the tSNE result
   output$tsnePlot<-renderPlot({
@@ -209,7 +286,7 @@ shinyServer(function(input, output,session) {
         filter(tsneClusterNames != "Noise") %>%
         na.omit()
  
-      #draw the tsne graph
+      #draw the tsne plot itself
       p<-df %>%
       mutate(isNoise = ifelse(tsneCluster==0,"Noise","Signal"))%>% 
       ggplot(aes(x=tsneComp1,y=tsneComp2,group=tsneClusterNames))+

@@ -1,4 +1,3 @@
-# Takes the input string and outputs a nice table
 processSearch<-function(query=NULL,demoversion=TRUE){
   
   #Running Query on Pubmed - kinda just gets me PMIDS
@@ -448,8 +447,6 @@ clusterSummaryText<-function(tmp = NULL){
   
   return(hovMsg)
 }
-
-#Processing pubmed JSON metadata
 
 
 #processing the JSON files from the pubmed document additional metadata
