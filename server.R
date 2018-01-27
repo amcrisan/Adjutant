@@ -10,29 +10,35 @@ library(dbscan)
 library(ggplot2)
 library(stringr)
 library(tidyr)
+library(scales)
 library(jsonlite)
 
-source("additionalFunctions.R")
+source("additionalFunctions.R") #additional analytic functions
 
+#set.seed(416) #repping the 6ix! 
 
 #a variable that changes up some parameters depending on whether this is the demo version of the app or not
 demoVersion<-FALSE
   
 #Query String used to testing
-queryString<-'"mycobacterium tuberculosis "[All Fields] AND "genome"[All Fields] AND (("2016/01/01"[PDAT] : "2017/10/01"[PDAT]) AND English[lang]) AND (("2016/01/01"[PDAT] : "2017/10/01"[PDAT]) AND English[lang])'
+#queryString<-'"mycobacterium tuberculosis "[All Fields] AND "genome"[All Fields] AND (("2016/01/01"[PDAT] : "2017/10/01"[PDAT]) AND English[lang]) AND (("2016/01/01"[PDAT] : "2017/10/01"[PDAT]) AND English[lang])'
 #queryString<-'"mycobacterium tuberculosis "[All Fields] AND (("2016/10/01"[PDAT] : "2017/10/01"[PDAT]) AND English[lang]) AND (("2016/01/01"[PDAT] : "2017/10/01"[PDAT]) AND English[lang])'
 #queryString<-'(("prostatic neoplasms"[MeSH Terms] OR ("prostatic"[All Fields] AND "neoplasms"[All Fields]) OR "prostatic neoplasms"[All Fields] OR ("prostate"[All Fields] AND "cancer"[All Fields]) OR "prostate cancer"[All Fields]) AND ("genomics"[MeSH Terms] OR "genomics"[All Fields])) AND ("2014/10/01"[PDAT] : "2014/12/01"[PDAT])'
+queryString<-'"IEEE transactions on visualization and computer graphics"[Journal]'
 
-#function to update searchInput. Adapted from update awesomeCheckbox
+
+# ---- SHINY SPECIFIC FUNCTIONS ---
+#From: https://github.com/rstudio/shiny-examples/blob/master/035-custom-input-bindings/url-input.R
+dropNulls <- function(x) {
+  x[!vapply(x, is.null, FUN.VALUE=logical(1))]
+}
+
+#function to update searchInput widget. Adapted from update awesomeCheckbox
 updateSearchInput <- function (session, inputId, value = NULL) {
   message <- dropNulls(list(value = value))
   session$sendInputMessage(inputId, message)
 }
 
-#From: https://github.com/rstudio/shiny-examples/blob/master/035-custom-input-bindings/url-input.R
-dropNulls <- function(x) {
-  x[!vapply(x, is.null, FUN.VALUE=logical(1))]
-}
 
 ## START THE SHOW
 shinyServer(function(input, output,session) {
@@ -52,7 +58,7 @@ shinyServer(function(input, output,session) {
 
   #populate the dataset based upon searching
   observeEvent(input$searchQuery_search,{
-    df<-processSearch(input$searchQuery)
+    df<-processSearch(input$searchQuery,demoVersion)
     values$corpus<-df
     values$totalDocs<-nrow(df)
     
@@ -109,7 +115,7 @@ shinyServer(function(input, output,session) {
     # TO DO: Clear the values if a new analysis has begun
     if(is.null(values$tsneObj)){
       #run the actual analysis, getting the tSNE object!
-      tidyCorpus_df<-tidyCorpus(values$corpus)
+      tidyCorpus_df<-tidyCorpus(values$corpus) #some documents are dropped here
       tsneObj<-runTSNE(tidyCorpus_df,check_duplicates=FALSE)
       
       #add these data objects to the running register
@@ -119,22 +125,26 @@ shinyServer(function(input, output,session) {
       #add the co-ordinate information to the main corpus document
       values$corpus<-inner_join(values$corpus,tsneObj$Y,by="PMID")
       
-      #save the tsne object too, it helps a tad with the debugged
-      savedFileName<-paste("./storedRuns/", "TSNE_temporaryStorage.RDS", sep = "")
-      saveRDS(values$corpus,file=savedFileName)
-      
       #get the clusters for the tsne perplexity 100 plot using HDBSCAN
       optClusters <- optimalParam(values$corpus) #still working on this
+      print(colnames(optClusters))
       values$corpus<-inner_join(values$corpus,optClusters,by="PMID")
       
       #give names to the cluster points
       clustNames<-values$corpus %>%
         group_by(tsneCluster)%>%
         mutate(tsneClusterNames = getTopTerms(clustPMID = PMID,clustValue=tsneCluster,topNVal = 2,tidyCorpus=tidyCorpus_df)) %>%
-        select(PMID,tsneClusterNames)
+        select(PMID,tsneClusterNames) %>%
+        ungroup()
       
-      values$corpus<-inner_join(values$corpus,clustNames,by="PMID")
+      
+      
+      values$corpus<-inner_join(values$corpus,clustNames,by=c("PMID","tsneCluster"))
       #corpus<-inner_join(corpus,tsneObj$Y,by="PMID")
+      
+      #save the tsne object too, it helps a tad with the debugged
+      savedFileName<-paste("./storedRuns/", "TSNE_temporaryStorage.RDS", sep = "")
+      saveRDS(values$corpus,file=savedFileName)
       
       #Update the tabset panel
       updateTabsetPanel(session, "overviewPanel",
@@ -144,8 +154,15 @@ shinyServer(function(input, output,session) {
     }
   })
   
+  #As people hover over points in the tsnebox populate information about the cluster
+  observe({
+    if(!is.null(input$plot_brush)){
+      values$hoveredCluster<-hoveredClusterSum(values$corpus,input$plot_brush)
+    }
+  })
+  
   # Documents within a selected cluster
-  output$documentTable <- renderDataTable({
+  output$documentTable <- DT::renderDataTable({
     if(!is.null(values$corpus)){
       values$corpus %>%
         select(-contains("meshTerms"), -contains("Abstract"))
@@ -160,10 +177,11 @@ shinyServer(function(input, output,session) {
   output$exploreBox<-renderUI({
     if(!is.null(values$tsneObj)){
       shinydashboard::box(title="Explore Clusters",
-        solidHeader = TRUE,
-        collapsible = FALSE,
+        id="exploreClust",
         width=NULL,#column layout
-        computeClustSummary(values$corpus,input$plot_hover)
+        clusterSummaryText(values$hoveredCluster),
+        topClustTerms(values$corpus,values$corpusTidy,values$hoveredCluster),
+        getTopPapers(values$corpus,values$hoveredCluster)
       )
     }else{
       NULL
@@ -174,23 +192,29 @@ shinyServer(function(input, output,session) {
   
   #Plot the tSNE result
   output$tsnePlot<-renderPlot({
-    if(!is.null(values$tsneObj)){
+    if(!is.null(values$corpus$tsneClusterNames)){
       
       df<-values$corpus
       
       #seperate data object for cluster names
       clusterNames <- df %>%
-        group_by(tsneClusterNames) %>%
-        summarise(medX = median(tsneComp1),
+        dplyr::group_by(tsneClusterNames) %>%
+        dplyr::summarise(medX = median(tsneComp1),
                   medY = median(tsneComp2)) %>%
-        filter(tsneClusterNames != "Noise")
+        dplyr::filter(tsneClusterNames != "Noise")
       
+      #draw hulls around the clusters
+      chulls <- plyr::ddply(df, "tsneClusterNames", function(dat) dat[chull(dat$tsneComp1, dat$tsneComp2), ]) %>%
+        select(tsneClusterNames,tsneComp1,tsneComp2) %>%
+        filter(tsneClusterNames != "Noise") %>%
+        na.omit()
+ 
       #draw the tsne graph
       p<-df %>%
-      mutate(isNoise = ifelse(tsneCluster.x==0,"Noise","Signal"))%>% 
+      mutate(isNoise = ifelse(tsneCluster==0,"Noise","Signal"))%>% 
       ggplot(aes(x=tsneComp1,y=tsneComp2,group=tsneClusterNames))+
         geom_point(aes(colour=isNoise,alpha=isNoise))+
-        stat_ellipse(col="red",aes(size=isNoise))+
+        geom_polygon(data = chulls,aes(x=tsneComp1,y=tsneComp2,group=tsneClusterNames),size=2,colour="red",fill=NA)+
         ylab("tsne comp. 2")+
         xlab("tsne comp. 1")+
         scale_size_manual(values=c(0,1))+
@@ -202,10 +226,42 @@ shinyServer(function(input, output,session) {
       if(input$showName){
         p<-p+geom_label(data=clusterNames,aes(x=medX,y=medY,label=tsneClusterNames),col="blue",size=3,check_overlap=TRUE,fontface="bold")
       }
-      
       p
     }else{
       NULL
+    }
+  })
+  
+  #testing a box
+  output$topTermsBox<-renderPlot({
+    if(is.null(values$hoveredCluster)){
+      NULL
+    }else{
+      
+      #Find docs in cluster
+      clustVal<-values$hoveredCluster$tsneClusterNames[1]
+      pmids<-filter(values$corpus,tsneClusterNames %in% clustVal)%>%
+        select(PMID)
+      
+      df<-values$corpusTidy %>%
+        filter(PMID %in% pmids$PMID) %>% 
+        group_by(wordStemmed) %>%
+        dplyr::count()%>%
+        ungroup()%>%
+        mutate(freq = nn/nrow(pmids)) %>%
+        arrange(-freq) %>% 
+        top_n(10)
+          
+      
+      p<-ggplot(df,aes(x=reorder(wordStemmed,freq),y=freq))+
+        xlab("Keyword (stemmed)")+
+        ylab("% of documents containing term")+
+        scale_y_continuous(labels=scales::percent,limits=c(0,1))+
+        geom_bar(stat="identity")+
+        coord_flip()+
+        theme_bw()
+      
+      p
     }
   })
   

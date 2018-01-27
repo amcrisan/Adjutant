@@ -1,0 +1,15 @@
+Package: adjutant
+Title: Adjutant - support for systematic reviews
+Version: 0.1.0
+Date: 2018-01-26
+Authors@R: person("Ana", "Crisan", email = "acrisan@cs.ubc.ca", role = c("aut", "cre"))
+Description: Full texts for Jane Austen's 6 completed novels, ready for text
+    analysis. These novels are "Sense and Sensibility", "Pride and Prejudice",
+    "Mansfield Park", "Emma", "Northanger Abbey", and "Persuasion".
+URL: https://github.com/amcrisan/adjutant
+BugReports: https://github.com/amcrisan/adjutant/issues
+Depends: R (>= 3.1.2)
+Imports: dplyr
+License: MIT + file LICENSE
+LazyData: true
+Encoding: UTF-8

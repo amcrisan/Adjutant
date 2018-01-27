@@ -34,7 +34,7 @@ body<-dashboardBody(
              uiOutput("summaryText"),
              uiOutput("analysisButton"),
              br(),
-             dataTableOutput("documentTable")
+             DT::dataTableOutput("documentTable")
     ),
     tabPanel("Search Overview",
              p("Comming Soon")
@@ -45,7 +45,7 @@ body<-dashboardBody(
             fluidRow(
               column(7,
                 plotOutput("tsnePlot",
-                           hover = "plot_hover")
+                           brush = "plot_brush")
               ),
               column(5,
                 uiOutput("exploreBox")
