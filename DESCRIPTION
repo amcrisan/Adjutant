@@ -21,7 +21,7 @@ Imports: dplyr,
         RISmed,
         shiny,
         shinydashboard,
-        shinywidgets
+        shinyWidgets
 License: MIT + file LICENSE
 LazyData: true
 Encoding: UTF-8
