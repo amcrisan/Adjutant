@@ -43,7 +43,7 @@ getTopPapers<-function(corpus=NULL,hoveredCluster=NULL){
   if(!is.null(hoveredCluster)){
     topRef<-corpus %>%
       filter(tsneClusterNames %in% hoveredCluster$tsneClusterNames[1]) %>%
-      mutate(pmcCitationCount = as.numeric(as.character(pmcCitationCount)))%>%
+      mutate(pmcCitationCount = as.numeric(as.character(pmcCitationCount)))%>% #for some reason, this is a factor..
       filter(!is.na(pmcCitationCount))
     
     

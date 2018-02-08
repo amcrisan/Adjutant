@@ -112,6 +112,7 @@ optimalParam<-function(corpus = NULL){
   bestFit<-max(clustFitScore$adj.r.squared)
   clustFitScore<-mutate(clustFitScore,nextBest = bestFit - adj.r.squared)
   
+  #identify several models with roughlyg similar R^2 performance
   clustFitSeveralBest<-clustFitScore %>%
     filter(nextBest <0.05)%>%
     arrange(-BIC)
@@ -131,6 +132,8 @@ optimalParam<-function(corpus = NULL){
   
   return(tmp)
 }
+
+
 
 #a function that names clusters
 getTopTerms<-function(clustPMID=NULL,topNVal=1,clustValue = NA,tidyCorpus = NULL){

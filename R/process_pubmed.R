@@ -17,9 +17,10 @@ processSearch<-function(query=NULL,demoversion=TRUE){
   
   #Gather data in batches and convert to data frame
   #format the data
-  #need to put everything together in batches, 2000 articles was the magic number before time outs occur
-  numVals<-seq(from=0,to=length(pmidUnique),by=2000)
-  numVals<-c(numVals,tail(numVals, n=1) + (length(pmidUnique) %% 2000))
+  #need to put everything together in batches, 200 articles was the magic number before time outs occur
+  #in both risemed and also limits of what esummary will return
+  numVals<-seq(from=0,to=length(pmidUnique),by=100)
+  numVals<-c(numVals,tail(numVals, n=1) + (length(pmidUnique) %% 100))
     
   corpus<-c()
   for(i in 1:(length(numVals)-1)){
@@ -43,17 +44,17 @@ formatData<-function(ids = NULL){
   #limitation : extract resuts as sets of 200. There's a limit to how many
   #iI passed 2000 objects in, but 1/10th of that seems to be the magic # before timeoouts
   
-  if(length(ids) <100){
-    #process all at once
-    numVals<-c(1,length(ids))
-  }else{
-    #break it up into chunks b.c it makes it easier to query
-    numVals<-seq(from=0,to=length(ids),by=100)
-    
-    if(tail(numVals, n=1)< length(ids)){
-      numVals<-c(numVals,tail(numVals, n=1) + (length(ids) %% 100))
-    }
-  }
+  # if(length(ids) <100){
+  #   #process all at once
+  #   numVals<-c(1,length(ids))
+  # }else{
+  #   #break it up into chunks b.c it makes it easier to query
+  #   numVals<-seq(from=0,to=length(ids),by=100)
+  #   
+  #   if(tail(numVals, n=1)< length(ids)){
+  #     numVals<-c(numVals,tail(numVals, n=1) + (length(ids) %% 100))
+  #   }
+  # }
   
   #data frame to be filled with glorious data
   allData<-data.frame(PMID=NULL,
@@ -73,15 +74,16 @@ formatData<-function(ids = NULL){
   
   #This here makes the queries into small manageable chucks so it doesn't time out.
   
-  # TO DO: maybe now since Pubmed allows for JSON files to be downloaded, I could just use that
-  # instead of risemed? It was the XML parsing that was stupid... think about the conversion.
-  # right now risemed works really well.
-  for(i in 1:(length(numVals)-1)){
+  # TO DO: Switch from RISEmed to just parsing JSON files. Right now, esummary produces valid JSON
+  # files that are nice and easy to parse. But efetch does not produce something nice and it seems
+  # the best way to query through R right now is to use risemed for eftech. Apparently efetch is the only
+  # part of the eUtils suite that DOESN'T yet properly return JSON. eSearch does and eSummary does.
+  #for(i in 1:(length(numVals)-1)){
     #to make this faster, form new query on ID run in parallel
-    start = numVals[i]
-    end = numVals[i + 1]
+    #start = numVals[i]
+    #end = numVals[i + 1]
     
-    tmpids<-ids[start:end]
+    tmpids<-ids
     pubResults<-EUtilsGet(paste0(tmpids,collapse = ","),type="efetch",db="pubmed")
     
     #make sure that results out = result in. EUtils 
@@ -141,8 +143,9 @@ formatData<-function(ids = NULL){
     #temp$meshTerms<-pubResults@Mesh
     temp$meshTerms<-meshTerms
     
-    allData<-rbind(allData,temp)
-  }
+    #allData<-rbind(allData,temp)
+    
+    allData<-temp
   
   return(allData)
 }

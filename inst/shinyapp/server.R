@@ -12,6 +12,7 @@ library(stringr)
 library(tidyr)
 library(scales)
 library(jsonlite)
+library(ggthemes)
 
 #additional analytic functions
 source("../../R/process_pubmed.R")
@@ -25,10 +26,10 @@ set.seed(416) #repping the 6ix!
 demoVersion<-FALSE
   
 #Query Strings used for testing testing - I use a couple of example here
-#queryString<-'"mycobacterium tuberculosis "[All Fields] AND "genome"[All Fields] AND (("2016/01/01"[PDAT] : "2017/10/01"[PDAT]) AND English[lang]) AND (("2016/01/01"[PDAT] : "2017/10/01"[PDAT]) AND English[lang])'
+queryString<-'"mycobacterium tuberculosis "[All Fields] AND "genome"[All Fields] AND (("2016/01/01"[PDAT] : "2017/10/01"[PDAT]) AND English[lang]) AND (("2016/01/01"[PDAT] : "2017/10/01"[PDAT]) AND English[lang])'
 #queryString<-'"mycobacterium tuberculosis "[All Fields] AND (("2016/10/01"[PDAT] : "2017/10/01"[PDAT]) AND English[lang]) AND (("2016/01/01"[PDAT] : "2017/10/01"[PDAT]) AND English[lang])'
 #queryString<-'(("prostatic neoplasms"[MeSH Terms] OR ("prostatic"[All Fields] AND "neoplasms"[All Fields]) OR "prostatic neoplasms"[All Fields] OR ("prostate"[All Fields] AND "cancer"[All Fields]) OR "prostate cancer"[All Fields]) AND ("genomics"[MeSH Terms] OR "genomics"[All Fields])) AND ("2014/10/01"[PDAT] : "2014/12/01"[PDAT])'
-queryString<-'"IEEE transactions on visualization and computer graphics"[Journal]'
+#queryString<-'"IEEE transactions on visualization and computer graphics"[Journal]'
 
 
 # ---- SHINY SPECIFIC FUNCTIONS ---
@@ -50,6 +51,10 @@ shinyServer(function(input, output,session) {
   #Kill browser deployed app on exit for non-demo version
   if(!demoVersion){ session$onSessionEnded(stopApp)}
   
+  #------------------------------------------------------------------------------------
+  # REACTIVE VALUES AND DATA SETS
+  #------------------------------------------------------------------------------------
+  
   #Storage of reactive dataset values
   values<-reactiveValues(
     totalDocs = 0,
@@ -58,9 +63,14 @@ shinyServer(function(input, output,session) {
     subset = NULL,
     tsneObj = NULL,
     hoveredCluster= NULL,
-    analysisProgress = FALSE
+    analysisProgress = FALSE,
+    fileName = format(Sys.time(), "%Y-%m-%d_%H-%M")
   )
 
+  #------------------------------------------------------------------------------------
+  # REACTIVE EVENTS FOR LOADING DATA
+  #------------------------------------------------------------------------------------
+  
   ##########################################
   # Events to support loading of dataset
   #
@@ -76,7 +86,7 @@ shinyServer(function(input, output,session) {
     updateSearchInput(session,"searchQuery",value = queryString)
   })
   
-  # Observe is 'search' button is pushed to initate pubmed query
+  # Observe if 'search' button is pushed to initate pubmed query
   observeEvent(input$searchQuery_search,{
     if(!values$analysisProgress){
       
@@ -96,6 +106,10 @@ shinyServer(function(input, output,session) {
     }else{
       print("Please clear previous analysis before starting a new one")
     }
+    
+    #automatically go to the searchOverview
+    updateTabItems(session, "sidebarTabs","searchOverview")
+    
   })
   
   # OPTION 2: Users load PREVIOUS data
@@ -115,7 +129,11 @@ shinyServer(function(input, output,session) {
     }else{
       print("Please clear previous analysis before starting a new one")
     }
+    
+    #automatically go to the searchOverview
+    updateTabItems(session, "sidebarTabs","searchOverview")
   })
+  
   
   
   ##########################################
@@ -124,36 +142,6 @@ shinyServer(function(input, output,session) {
   # Populate the Search results tab with a summary message
   # and table of the search results. Enable the user to initate 
   # the clustering analysis
-  
-  #output some summary text of how many articles there are in a document
-  output$summaryText<-renderUI({
-    
-    if(!is.null(values$corpus)){
-     HTML(sprintf('<p>There are currently <strong>%d</strong> articles in the document corpus</p>',values$totalDocs))
-    }else{
-      NULL
-    }
-    
-  })
-  
-  # text that user clicks on to begin downstream clustering analysis
-  output$analysisButton <-
-    renderUI(expr = if (!is.null(values$corpus)) {
-      actionLink("analyzeCorpus","Click here to generate an automatic overview of the document corpus")
-    } else {
-      HTML(sprintf('<br><p><Strong>Nothing to report!</strong> Enter a search query first.</p>'))
-    })
-  
-  #output some summary text of how many articles there are in a document
-  output$summaryTextAnalysis<-renderUI({
-    
-    if(!is.null(values$tsneObj)){
-      HTML("<br> <strong>Here are your results!</strong>. Have a lot of fun exploring")
-    }else{
-      HTML("<br> <strong>Nothing here yet!</strong> Enter a query to generate a document corpus and then select the option to start the analysis in the <em>'Search Results'</em> tab")
-    }
-    
-  })
   
   # A data table containing the document corpus
   output$documentTable <- DT::renderDataTable({
@@ -165,13 +153,14 @@ shinyServer(function(input, output,session) {
     
   },server=TRUE,extensions = c('Responsive','Buttons','FixedHeader'), options = list(
     dom = 'Bfrtip',
-    buttons = c('copy', 'csv', 'excel'),
+    buttons = c('csv', 'excel'),
     fixedHeader=TRUE
   ))
   
   
-  ##########################################
-  # Cluster Analysis of document corpus
+  #------------------------------------------------------------------------------------
+  # REACTIVE EVENTS FOR DIMENSIONALITY REDUCTION & TOPIC CLUSTERING
+  #------------------------------------------------------------------------------------
   
   # Once the analysis button is clicked, autmatically go to that tab
   observeEvent(input$analyzeCorpus, {
@@ -244,7 +233,94 @@ shinyServer(function(input, output,session) {
   })
   
 
-  # In the cluster tab, and when the user brushes
+  
+  #------------------------------------------------------------------------------------
+  # REACTIVE EVENTS TO CLEAR THE PRESENT ANALYSIS 
+  #------------------------------------------------------------------------------------
+  observeEvent(input$sidebarTabs,{
+    if(input$sidebarTabs == "clearAnalysis"){
+      
+      values$totalDocs <- 0
+      values$corpus <- NULL #original document corpus
+      values$corpusTidy <- NULL
+      values$subset <- NULL
+      values$tsneObj <- NULL
+      values$hoveredCluster <- NULL
+      values$analysisProgress <- FALSE
+      
+      updateTabsetPanel(session, "sidebarTabs", selected = "searchIn")
+      
+      updateSearchInput(session,"searchQuery",value = "")
+    }
+    
+  })
+  
+  #------------------------------------------------------------------------------------
+  # UI ELEMENTS (WIDGETS, MENUS) THAT ARE DATA DEPENDENT 
+  #------------------------------------------------------------------------------------
+  
+  #menu item that displays the number of documents in the corpus
+  output$searchMenu<-renderMenu({
+    badgeLabel<-ifelse(is.null(values$corpus),"0",toString(nrow(values$corpus)))
+    menuItem("Search Results", tabName = "searchOverview", icon = icon("book"),badgeLabel = badgeLabel)
+  })
+  
+  #output some summary text of how many articles there are in a document
+  output$summaryText<-renderUI({
+    
+    if(!is.null(values$corpus)){
+      tmp<-values$corpus$Journal %>% unique() %>% length()
+       
+      HTML(sprintf("There are <b>%d</b> documents sourced from <b>%d</b> journals published from <b>%s</b> to <b>%s</b>", nrow(values$corpus),tmp,min(values$corpus$YearPub),max(values$corpus$YearPub)))
+    }else{
+      HTML("You need to start a search or load some data before you can have any results!")
+    }
+    
+  })
+  
+  
+  # a button that initiates the analysis of the document corpus!
+  
+  output$topicClustInitiateButton<-renderUI({
+    if(!is.null(values$corpus) & is.null(values$tsneObj)){
+      actionButton("analyzeCorpus",label="Inititate Topic Clustering")
+    }else if(!is.null(values$tsneObj)){
+      return(NULL)
+    }else{
+      return(NULL)
+    }
+  })
+  
+  
+  
+  #Some instruction text that tells user to run a search before they can do topic anlaysis
+  output$corpusOverviewStatement<-renderUI({
+    if(!is.null(values$corpus)){
+      return(NULL)
+    }else{
+      HTML("<br> <strong>Nothing here yet!</strong> Search PubMed or load a prior analysis from the 'Search' menu item")
+    }
+    
+  })
+  
+  #Allow user to enter alternative file name for analysis files
+  output$analysisFileName<-renderUI({
+    if(input$saveAnalysis){
+      searchInput(
+        inputId = "analysisName", 
+        label = "File Names for Save Analysis:", 
+        placeholder = sprintf("Enter alternative file"),
+        value = values$fileName,
+        btnSearch = icon("check"), 
+        btnReset = icon("remove"), 
+        width = "300px"
+      )
+    }else{
+      return(NULL)
+    }
+  })
+  
+  # In the topic cluster tab, and when the user brushes
   # over points in the tsnePlot, populate a 
   # box with some information about the cluster.
   # That informaiton is: the name of the cluster,
@@ -253,19 +329,176 @@ shinyServer(function(input, output,session) {
   output$exploreBox<-renderUI({
     if(!is.null(values$tsneObj)){
       shinydashboard::box(title="Explore Clusters",
-        id="exploreClust",
-        width=NULL,#column layout
-        clusterSummaryText(values$hoveredCluster),
-        topClustTerms(values$corpus,values$corpusTidy,values$hoveredCluster),
-        getTopPapers(values$corpus,values$hoveredCluster)
+                          id="exploreClust",
+                          width=NULL,#column layout
+                          clusterSummaryText(values$hoveredCluster),
+                          topClustTerms(values$corpus,values$corpusTidy,values$hoveredCluster),
+                          getTopPapers(values$corpus,values$hoveredCluster)
       )
     }else{
       NULL
     }
   })
   
-  ##########################################
-  # Visualizations
+  
+  #------------------------------------------------------------------------------------
+  # VISUALIZATIONS
+  #------------------------------------------------------------------------------------
+ 
+  ################################
+  # Document summary plots
+  
+  #years spanning the publication records
+  output$yearPubPlot<-renderPlot({
+    p<-NULL
+    if(!is.null(values$corpus)){
+      p<- values$corpus %>%
+        group_by(YearPub) %>%
+        count()%>% 
+        ggplot(aes(x=YearPub,y=n))+
+        geom_bar(stat="identity")+
+        ylab("total # of papers")+
+        xlab("Publication Year")+
+        scale_x_continuous(limits=c(min(values$corpus$YearPub),max(values$corpus$YearPub)))+
+        ggtitle("Publications per Year")+
+        theme_bw()
+    }
+    p
+    
+  })
+  
+  #fiv most common journals
+  output$journalPubTime<-renderPlot({
+    p<-NULL
+    
+    if(!is.null(values$corpus)){
+      #get the most published in journals for the document corpus
+      journalCount<-values$corpus %>%
+        group_by(Journal)%>%
+        count() %>%
+        arrange(-n)
+      
+      #make the plot
+      p<-values$corpus %>%
+        filter(Journal %in% journalCount$Journal[1:5]) %>%
+        select(YearPub,Journal)%>%
+        group_by(YearPub,Journal)%>%
+        count()%>%
+        ungroup() %>%
+        ggplot(aes(x=YearPub,y=n))+
+        geom_line(aes(colour=Journal),size=2)+
+        geom_point(aes(colour=Journal),pch=21,fill="white",size=2)+
+        labs(title="Top five journals where articles were published",
+             x="Publication Year",
+             y="% of documents published in that journal") +
+        scale_x_continuous(limits=c(min(values$corpus$YearPub),max(values$corpus$YearPub)))+
+        scale_colour_brewer(palette = "Set2")+
+        theme_bw()
+    }
+    
+    p
+  })
+  #top ten most common meshTerms over time
+  output$meshTimePlot<-renderPlot({
+    p<-NULL
+    
+    if(!is.null(values$corpus)){
+      #meshTerms over time
+      topTerms<-values$corpus%>% 
+        select(YearPub,meshTerms) %>%
+        transform(meshTerms = strsplit(meshTerms,";"))%>%
+        tidyr::unnest(meshTerms) %>% 
+        na.omit(meshTerms) %>%
+        group_by(YearPub,meshTerms) %>%
+        count()
+      
+      #overall top mesh terms
+      overallCount <- topTerms %>%
+        ungroup()%>%
+        group_by(meshTerms)%>%
+        tally(n)%>%
+        top_n(10)
+      
+      #make the plot!
+      p<-topTerms %>%
+        ungroup()%>%
+        filter(meshTerms %in% overallCount$meshTerms) %>%
+        ggplot(aes(x=YearPub,y=n,group=meshTerms))+
+        geom_line(aes(colour=meshTerms),size=2)+
+        geom_point(aes(colour=meshTerms),pch=21,fill="white",size=2)+
+        labs(title="Instances of ten most common mesh terms over time",
+             subtitle="Note that not all articles have been assigned mesh terms ",
+             x="Publication Year",
+             y="# of documents containing the Mesh Term") +
+        scale_colour_tableau("tableau10medium")+
+        scale_x_continuous(limits=c(min(values$corpus$YearPub),max(values$corpus$YearPub)))+
+        theme_bw()
+      
+    }
+    
+    p
+  })
+  
+  #top 10 common mesh terms and their use over time
+  
+  output$meshWordCloud<-renderPlot({
+    p<-NULL
+    
+    if(!is.null(values$corpus)){
+      meshTermsCount<-values$corpus %>% 
+        select(YearPub,meshTerms) %>%
+        transform(meshTerms = strsplit(meshTerms,";"))%>%
+        tidyr::unnest(meshTerms) %>% 
+        transform(meshTerms = strsplit(meshTerms,",")) %>% #split out some of those concepts for worldcloud
+        tidyr::unnest(meshTerms) %>% 
+        na.omit(meshTerms) %>%
+        group_by(meshTerms)%>%
+        count()
+      
+      meshTermsCount<-meshTermsCount %>%
+        mutate(freq = n/nrow(meshTermsCount))
+      
+      p<-wordcloud(meshTermsCount$meshTerms,meshTermsCount$freq,max.words=50,rot.per=0,main="mesh term wordcloud")
+    }
+    
+    p
+  })
+  
+  
+  #now, make a list of the 10 most cited articles (according to PMC)
+  
+  output$topCorpusArticles<-renderUI({
+    topPapers<-""
+    
+    if(!is.null(values$corpus)){
+      topRef<-values$corpus%>%
+        mutate(pmcCitationCount = as.numeric(as.character(pmcCitationCount))) %>% #for some reason this is a factor
+        ungroup()%>%
+        arrange(-pmcCitationCount)%>%
+        top_n(10,pmcCitationCount)
+      
+      #summarize this all into a word thing to output
+      tmp2<-select(topRef,"PMID","YearPub","Journal","Authors","Title")
+      topPaperText<-apply(tmp2,1,function(x){
+        pmid = x[1]
+        year = x[2]
+        journal = x[3]
+        authors =  paste(strsplit(as.character(x[4]),";")[[1]][1],"<em>et.al</em>")
+        title = x[5]
+        
+        sprintf("%s (<strong>%s</strong>) <strong>%s</strong> %s PMID:<a target='_blank' href='https://www.ncbi.nlm.nih.gov/pubmed/%s'>%s</a>",authors,year,title,journal,pmid,pmid)
+      })
+      
+      topPapers<-paste0(topPaperText,collapse="<br><br>")
+      topPapers<-HTML(sprintf("%s",topPapers))
+    }
+    
+    topPapers
+    
+  })
+  
+  ################################
+  # Clustering and t-SNE scatter plot
   
   #Plot the tSNE result
   output$tsnePlot<-renderPlot({
@@ -300,8 +533,10 @@ shinyServer(function(input, output,session) {
         theme_bw()+
         theme(legend.position = "bottom")
       
-      if(input$showName){
-        p<-p+geom_label(data=clusterNames,aes(x=medX,y=medY,label=tsneClusterNames),col="blue",size=3,check_overlap=TRUE,fontface="bold")
+      if(!is.null(input$showName)){
+        if(input$showName){
+          p<-p+geom_label(data=clusterNames,aes(x=medX,y=medY,label=tsneClusterNames),col="blue",size=3,check_overlap=TRUE,fontface="bold")
+        }
       }
       p
     }else{
@@ -309,48 +544,77 @@ shinyServer(function(input, output,session) {
     }
   })
   
-  #testing a box
-  output$topTermsBox<-renderPlot({
-    if(is.null(values$hoveredCluster)){
-      NULL
+  #checkbox indidicating whether names should be overlain on the t-SNE plot
+  output$overlayNamesCheckbox<-renderUI({
+    if(!is.null(values$tsneObj)){
+      checkboxInput("showName","Overlay cluster names",value=FALSE)
     }else{
-      
-      #Find docs in cluster
-      clustVal<-values$hoveredCluster$tsneClusterNames[1]
-      pmids<-filter(values$corpus,tsneClusterNames %in% clustVal)%>%
-        select(PMID)
-      
-      df<-values$corpusTidy %>%
-        filter(PMID %in% pmids$PMID) %>% 
-        group_by(wordStemmed) %>%
-        dplyr::count()%>%
-        ungroup()%>%
-        mutate(freq = nn/nrow(pmids)) %>%
-        arrange(-freq) %>% 
-        top_n(10)
-          
-      
-      p<-ggplot(df,aes(x=reorder(wordStemmed,freq),y=freq))+
-        xlab("Keyword (stemmed)")+
-        ylab("% of documents containing term")+
-        scale_y_continuous(labels=scales::percent,limits=c(0,1))+
-        geom_bar(stat="identity")+
-        coord_flip()+
-        theme_bw()
-      
-      p
+      NULL
     }
   })
   
-})
-
-
+  # Define UI for the little cog wheel by the t-SNE plot
+  # It will depend on the optimal parameters
+  output$plotOptions<-renderUI({
+    
+    if(!is.null(values$corpus$tsneClusterNames)){
+      dropdownButton(
+        tags$h3("Change plot parameters"),
+        p("Change Graph Appearance"),
+        checkboxInput("showName","Overlay cluster names",value=FALSE),
+        p("tsne parameters"),
+        selectInput(inputId = 'xcol', label = 'X Variable', choices = names(iris)),
+        br(),
+        br(),
+        p("hbscan parameters"),
+        selectInput(inputId = 'ycol', label = 'Y Variable', choices = names(iris), selected = names(iris)[[2]]),
+        sliderInput(inputId = 'clusters', label = 'Cluster count', value = 3, min = 1, max = 9),
+        circle = TRUE, status = "danger", icon = icon("gear"), width = "300px",
+        tooltip = tooltipOptions(title = "Click to see inputs !")
+      )
+      
+     }else{
+      NULL
+    }
+  })
   
-  # columnDefs = list(list(
-  #   targets = c(3,4,5),
-  #   render = JS(
-  #     "function(data, type, row, meta) {",
-  #     "return type === 'display' && data.length > 100 ?",
-  #     "'<span title=\"' + data + '\">' + data.substr(0, 100) + '...</span>' : data;",
-  #     "}")
-  # ))), callback = JS('table.page(3).draw(false);')
+  
+  #------------------------------------------------------------------------------------
+  # INFO SUMMARY BOX UI
+  #------------------------------------------------------------------------------------
+  
+  
+  #For search statement
+  output$searchInfoStatement<-renderUI({
+    HTML("<b><big>Search PubMed</big></b> <a href='#searchInfo'data-toggle='collapse'><small><em>(show search details)</small></em></a>
+           <div id='searchInfo' class= 'collapse'>
+         Begin your search here by entering a valid <a href='https://www.ncbi.nlm.nih.gov/pubmed/' target='_blank'><strong>PubMed</strong></a> search string. To form more specific search strings, please consult Pubmed directly and copy and paste the Pubmed generated search string here. You can also <strong> load prior analyses </strong>, which are automatically stored in the 'prior runs' folder everytime you run a search with Adjutant
+         </div>")
+  })
+  
+  
+  #For search results tab
+  output$searchResInfoStatement<-renderUI({
+    HTML("<b><big>PubMed Search Results</big></b> <a href='#searchResultInfo'data-toggle='collapse'><small><em>(show search result details)</small></em></a>
+           <div id='searchResultInfo' class= 'collapse'>
+         Results from your Pubmed search will be displayed here. You can browse and download a table of your search results (referred to as the Document Corpus), or you are view a graphic summary of your results. Once you are satisfied with your search results you can initite an analysis to discover topic clusters within the document corpus.
+         </div>")
+  })
+  
+  
+  #For topic clustering tab
+  output$topicClustInfoStatement<-renderUI({
+    HTML("<b><big>Topic Clustering</big></b> <a href='#topicClustInfo'data-toggle='collapse'><small><em>(show topic clustering details)</small></em></a>
+               <div id='topicClustInfo' class= 'collapse'>
+                <br>
+                <p><em><b>Unsupervised cluster analysis of the document corpus</em></b><br> Adjutant uses article titles and abstracts to identify document clusters pertainaing to some topic. Given some set of documents, Adjutant creates a tidytext corpus using single terms <a href='https://www.tidytextmining.com/' target='_blank'>(see the excellent tidytext mining online book)</a>. Following some data wrangling and cleaning, which is detailed in our manuscript, Adjuntant calculates the <a href='https://www.tidytextmining.com/tfidf.html' target ='_blank'> td-idf metric </a> and generates a document term matrix (DTM) to prepare for cluster analysis. Our approach unsupervised clustering was to use t-SNE to dimensionally reduce the data, via the <a href='https://cran.r-project.org/web/packages/Rtsne/index.html' target ='_blank'>RTsne package</a>, followed by hdbscan, from the <a href='hhttps://cran.r-project.org/web/packages/dbscan/README.html' target ='_blank'>dbscan package</a>, to cluster documents. Adjutant tries to optimize the initial hbscan parameters, again detailed in our paper, but you can also choose your own parameters. Documents that are not part of any cluster are considered to be noise. Finally clustered are assigned topics based upon the two most frequently occuring terms in each cluster. </p>
+<p><em><b>Exploring the topic clusters</em></b>
+  <ul>
+  <li>t-SNE scatter plot: the scatter plot below shows the 2D co-ordinates based upon dimensionality reduction of the DTM following t-SNE. The red shapes deliniate the cluster boundries, and you can double-click on a cluster to get more details in the <em>'Cluster Details'</em>. To change some t-SNE or hdbscan parameters click on the red cog.</li>
+  <li>Cluster Details box: an overview of the cluster including the total number of members, top-ten frequently occuring terms, and the five most cited papers in that cluster (according to PubMed central citation counts).</li>
+  </ul>
+</p>
+           </div>")
+  })
+
+})

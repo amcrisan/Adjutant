@@ -2,11 +2,17 @@
  background-color: white;
 }
 
+/*
 .skin-black .main-header {
   background-color: white;
   text-align: left;
 }        
+*/
 
+.skin-black .main-header>.logo{
+  text-align: left;
+  font-size: 30px;
+}
 /* Changing the width of the progress notifcation */
 #shiny-notification-panel{
   width: 350px;
@@ -28,3 +34,11 @@
     color: #000;
 }
 
+
+/* Single-direction drop shadow */
+
+.style-four {
+    height: 12px;
+    border: 0;
+    box-shadow: inset 0 12px 12px -12px rgba(0, 0, 0, 0.5);
+}
