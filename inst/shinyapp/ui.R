@@ -110,11 +110,12 @@ body<-dashboardBody(
       uiOutput("corpusOverviewStatement"),
       fluidRow(
         column(7,
-          uiOutput("plotOptions"),
-          plotOutput("tsnePlot", brush = "plot_brush")
+          plotOutput("tsnePlot", brush = "plot_brush"),
+          uiOutput("plotOptions")
         ),
-        column(5, uiOutput("exploreBox"))
-        ) #end of fluid row
+        column(5, uiOutput("selectCluster"))
+        ), #end of fluid row
+      uiOutput("clusterBox")
     ),
     #-------------------
     # Document Sampling

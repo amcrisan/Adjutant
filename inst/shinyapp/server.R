@@ -1,5 +1,6 @@
 library(shiny)
 library(RISmed)
+library(rms)
 library(dplyr)
 library(DT)
 library(dplyr)
@@ -13,6 +14,8 @@ library(tidyr)
 library(scales)
 library(jsonlite)
 library(ggthemes)
+library(wordcloud)
+
 
 #additional analytic functions
 source("../../R/process_pubmed.R")
@@ -119,7 +122,8 @@ shinyServer(function(input, output,session) {
       
       if(!is.null(input$prevAnalysis)){
         
-        df<-readRDS(paste("./storedRuns/",input$prevAnalysis$name,sep=""))
+        #df<-readRDS(paste("./storedRuns/",input$prevAnalysis$name,sep=""))
+        df<-readRDS(input$prevAnalysis$datapath)
         values$corpus<-df
         values$totalDocs<-nrow(df)
         values$analysisProgress <-TRUE
@@ -320,15 +324,44 @@ shinyServer(function(input, output,session) {
     }
   })
   
+  
+  #make summary buttons of topics 
+  
+  output$selectCluster<-renderUI({
+    if(!is.null(values$corpus$tsneClusterNames)){
+      #get clustername and size
+      clustName<-values$corpus %>%
+        group_by(tsneClusterNames) %>%
+        count()%>%
+        arrange(-n) %>%
+        mutate(modName = sprintf("%s (%d)",tsneClusterNames,n)) 
+      
+      #from shiny widgets
+      checkboxGroupButtons(
+        inputId = "clustButtonSelect", label = "Click on a cluster to get more details! :", 
+        choiceNames = clustName$modName, 
+        choiceValues = clustName$tsneClusterNames,
+        justified = FALSE, 
+        status = "primary",
+        individual=TRUE,
+        checkIcon = list(yes = icon("ok", lib = "glyphicon"))
+    )
+    }else{
+      NULL
+    }
+    
+  })
+  
+  
   # In the topic cluster tab, and when the user brushes
   # over points in the tsnePlot, populate a 
   # box with some information about the cluster.
   # That informaiton is: the name of the cluster,
   # the top-ten most frequently occuring words
   # and the 5 most cited papers (according to pubmed PMC)
-  output$exploreBox<-renderUI({
+  output$clusterBox<-renderUI({
     if(!is.null(values$tsneObj)){
-      shinydashboard::box(title="Explore Clusters",
+      shinydashboard::box(title="Cluster Details",
                           id="exploreClust",
                           width=NULL,#column layout
                           clusterSummaryText(values$hoveredCluster),
@@ -519,6 +552,7 @@ shinyServer(function(input, output,session) {
         filter(tsneClusterNames != "Noise") %>%
         na.omit()
  
+      
       #draw the tsne plot itself
       p<-df %>%
       mutate(isNoise = ifelse(tsneCluster==0,"Noise","Signal"))%>% 
