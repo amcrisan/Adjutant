@@ -65,8 +65,8 @@ shinyServer(function(input, output,session) {
     corpusTidy = NULL, # tidyText version of corpus
     subset = NULL,
     tsneObj = NULL,
-    hoveredCluster= NULL,
     analysisProgress = FALSE,
+    tnsePlot = NULL,
     fileName = format(Sys.time(), "%Y-%m-%d_%H-%M")
   )
 
@@ -229,13 +229,24 @@ shinyServer(function(input, output,session) {
     }
   })
   
-  #As people hover over points in the tsnebox populate information about the cluster
-  observe({
-    if(!is.null(input$plot_brush)){
-      values$hoveredCluster<-hoveredClusterSum(values$corpus,input$plot_brush)
+
+  observeEvent(input$plot_dbclick,{
+    if(!is.null(input$plot_dbclick)){
+      clickedClust<-clickedClusterSum(values$corpus,input$plot_dbclick)
+      
+      if(!is.null(clickedClust$tsneClusterNames)){
+        if(clickedClust$tsneClusterNames != "Noise" & clickedClust$tsneClusterNames %in% input$clustButtonSelect){
+          
+          #update only if actual cluster is clicked on
+          if(!is.null(input$clustDetails)){
+            #make sure that whatever you clicked in is available as a choice..
+            
+            updateSelectInput(session,"clustDetails",selected = clickedClust$tsneClusterNames)
+          }
+        }
+      }
     }
   })
-  
 
   
   #------------------------------------------------------------------------------------
@@ -249,8 +260,8 @@ shinyServer(function(input, output,session) {
       values$corpusTidy <- NULL
       values$subset <- NULL
       values$tsneObj <- NULL
-      values$hoveredCluster <- NULL
       values$analysisProgress <- FALSE
+      values$tsnePlot<-NULL
       
       updateTabsetPanel(session, "sidebarTabs", selected = "searchIn")
       
@@ -284,7 +295,6 @@ shinyServer(function(input, output,session) {
   
   
   # a button that initiates the analysis of the document corpus!
-  
   output$topicClustInitiateButton<-renderUI({
     if(!is.null(values$corpus) & is.null(values$tsneObj)){
       actionButton("analyzeCorpus",label="Inititate Topic Clustering")
@@ -298,11 +308,20 @@ shinyServer(function(input, output,session) {
   
   
   #Some instruction text that tells user to run a search before they can do topic anlaysis
-  output$corpusOverviewStatement<-renderUI({
-    if(!is.null(values$corpus)){
-      return(NULL)
-    }else{
+  output$clusterOverviewStatement<-renderUI({
+    if(!is.null(values$tsneObj)){
+      totalDoc<-nrow(values$corpus)
+      totalClust<-values$corpus %>% filter(tsneClusterNames !="Noise") %>% count()
+      perClust<-paste0(round((totalClust/totalDoc)*100,1),"%")
+      
+      nClust<-length(unique(values$corpus$tsneClusterNames))-1
+      
+      HTML(sprintf("Out of a total <b>%d</b> documents, <b>%d (%s)</b> were clustered within <b>%d</b> topics",totalDoc,totalClust$n,perClust,nClust))
+      
+    }else if(is.null(values$corpus)){
       HTML("<br> <strong>Nothing here yet!</strong> Search PubMed or load a prior analysis from the 'Search' menu item")
+    }else{
+      NULL
     }
     
   })
@@ -326,19 +345,20 @@ shinyServer(function(input, output,session) {
   
   
   #make summary buttons of topics 
-  
   output$selectCluster<-renderUI({
     if(!is.null(values$corpus$tsneClusterNames)){
       #get clustername and size
       clustName<-values$corpus %>%
+        filter(tsneClusterNames !="Noise") %>%
         group_by(tsneClusterNames) %>%
         count()%>%
         arrange(-n) %>%
-        mutate(modName = sprintf("%s (%d)",tsneClusterNames,n)) 
+        mutate(modName = sprintf("<b>%s</b> (%d)",tsneClusterNames,n)) 
       
       #from shiny widgets
       checkboxGroupButtons(
-        inputId = "clustButtonSelect", label = "Click on a cluster to get more details! :", 
+        inputId = "clustButtonSelect", 
+        label = "", 
         choiceNames = clustName$modName, 
         choiceValues = clustName$tsneClusterNames,
         justified = FALSE, 
@@ -352,6 +372,49 @@ shinyServer(function(input, output,session) {
     
   })
   
+  #checkbox to select all clusters
+  output$showAllClustNames<-renderUI({
+    if(!is.null(values$tsneObj)){
+      actionButton("showAllClust",label="Select All Topic Clusters")
+    }else{
+      NULL
+    }
+  })
+  
+  # if the select all clusters checkbox is clicked, then update clustButtonSelect
+  observeEvent(input$showAllClust,{
+    clustName<-values$corpus %>%
+      select(tsneClusterNames)%>%
+      unique()
+      
+    updateCheckboxGroupButtons(session,"clustButtonSelect",selected=clustName$tsneClusterNames)
+  })
+  
+
+  
+  # Define UI for the little cog wheel by the t-SNE plot
+  # It will depend on the optimal parameters
+  output$plotOptions<-renderUI({
+    
+    if(!is.null(values$corpus$tsneClusterNames)){
+      dropdownButton(
+        tags$h3("Change plot parameters"),
+        p("Change Graph Appearance"),
+        p("tsne parameters"),
+        selectInput(inputId = 'xcol', label = 'X Variable', choices = names(iris)),
+        br(),
+        br(),
+        p("hbscan parameters"),
+        selectInput(inputId = 'ycol', label = 'Y Variable', choices = names(iris), selected = names(iris)[[2]]),
+        sliderInput(inputId = 'clusters', label = 'Cluster count', value = 3, min = 1, max = 9),
+        circle = TRUE, status = "danger", icon = icon("gear"), width = "300px",
+        tooltip = tooltipOptions(title = "Click to see inputs !")
+      )
+      
+    }else{
+      NULL
+    }
+  })
   
   # In the topic cluster tab, and when the user brushes
   # over points in the tsnePlot, populate a 
@@ -359,18 +422,47 @@ shinyServer(function(input, output,session) {
   # That informaiton is: the name of the cluster,
   # the top-ten most frequently occuring words
   # and the 5 most cited papers (according to pubmed PMC)
-  output$clusterBox<-renderUI({
-    if(!is.null(values$tsneObj)){
-      shinydashboard::box(title="Cluster Details",
-                          id="exploreClust",
-                          width=NULL,#column layout
-                          clusterSummaryText(values$hoveredCluster),
-                          topClustTerms(values$corpus,values$corpusTidy,values$hoveredCluster),
-                          getTopPapers(values$corpus,values$hoveredCluster)
-      )
+  
+  output$clusterSelect<-renderUI({
+    if(!is.null(input$clustButtonSelect)){
+      #remove holder overs from previous analysis
+      if(is.null(values$tsneObj)){
+        HTML("To get cluster details, select some cluster(s) by <em>clicking on the topic buttons</em>")
+      }else{
+        selectInput("clustDetails", "Choose a cluster", choices= input$clustButtonSelect, multiple=FALSE)
+      }
     }else{
-      NULL
+      HTML("To get cluster details, select some cluster(s) by <em>clicking on the topic buttons</em>")
     }
+  })
+  
+  #show detailed cluster information on selections
+  output$clusterDetails<-renderUI({
+    clustInfo<-NULL
+    
+    if(!is.null(values$tsneObj)){
+      if(!is.null(input$clustDetails) & !is.null(input$clustButtonSelect)){
+        #when there is a reset event
+        if(!is.null(values$tsneObj)){
+          #generate the summaries that will fill up the lovely topic box
+          clustSum<-clusterSummaryText(values$corpus,input$clustDetails)
+          clustTerms<-topClustTerms(values$corpus,values$corpusTidy,input$clustDetails)
+          clustPapers<- getTopPapers(values$corpus,input$clustDetails)
+          
+          clustInfo<-HTML(paste(c(clustSum,clustTerms,clustPapers)))
+        }
+      }
+    }
+    
+    clustInfo
+  })
+  
+  output$clusterDetailsNote<-renderUI({
+    preamble<-NULL
+    if(!is.null(values$tsneObj) & !is.null(input$clustDetails)){
+    preamble<-HTML("If you've selected more than one cluster (topic) use the dropdown box below, or you can double click on the plot above, to get more details about a specific cluster <hr>")
+    }
+    preamble
   })
   
   
@@ -400,7 +492,7 @@ shinyServer(function(input, output,session) {
     
   })
   
-  #fiv most common journals
+  #five most common journals
   output$journalPubTime<-renderPlot({
     p<-NULL
     
@@ -533,19 +625,14 @@ shinyServer(function(input, output,session) {
   ################################
   # Clustering and t-SNE scatter plot
   
-  #Plot the tSNE result
-  output$tsnePlot<-renderPlot({
-    if(!is.null(values$corpus$tsneClusterNames)){
+  # Plot the tSNE result, make this seperate from the cluster labels
+  # so I don't recompute the plot every time I update the labels!
+  observe({
+    if(!is.null(values$corpus$tsneClusterNames) & is.null(values$tsnePlot)){
       
       df<-values$corpus
       
-      #seperate data object for cluster names
-      clusterNames <- df %>%
-        dplyr::group_by(tsneClusterNames) %>%
-        dplyr::summarise(medX = median(tsneComp1),
-                  medY = median(tsneComp2)) %>%
-        dplyr::filter(tsneClusterNames != "Noise")
-      
+    
       #draw hulls around the clusters
       chulls <- plyr::ddply(df, "tsneClusterNames", function(dat) dat[chull(dat$tsneComp1, dat$tsneComp2), ]) %>%
         select(tsneClusterNames,tsneComp1,tsneComp2) %>%
@@ -555,61 +642,74 @@ shinyServer(function(input, output,session) {
       
       #draw the tsne plot itself
       p<-df %>%
-      mutate(isNoise = ifelse(tsneCluster==0,"Noise","Signal"))%>% 
+      mutate(isNoise = ifelse(tsneCluster==0,"Non-Clustered","Clustered"))%>% 
       ggplot(aes(x=tsneComp1,y=tsneComp2,group=tsneClusterNames))+
         geom_point(aes(colour=isNoise,alpha=isNoise))+
         geom_polygon(data = chulls,aes(x=tsneComp1,y=tsneComp2,group=tsneClusterNames),size=2,colour="red",fill=NA)+
-        ylab("tsne comp. 2")+
-        xlab("tsne comp. 1")+
-        scale_size_manual(values=c(0,1))+
-        scale_alpha_manual(values=c(0.2,0.5))+
-        scale_colour_manual(values=c("#ade6e6","black"))+
+        labs(title ="t-SNE Plot of Document Corpus",
+             x ="t-SNE co-ordinate 1",
+             y ="t-SNE co-ordinate 2")+
+        scale_size_manual(values=c(0,1),name="")+
+        scale_alpha_manual(values=c(0.3,0.7),name="")+
+        scale_colour_manual(values=c("black","#ade6e6"),name="")+
         theme_bw()+
-        theme(legend.position = "bottom")
+        theme(legend.position = "bottom",legend.text = element_text(size=14))
       
-      if(!is.null(input$showName)){
-        if(input$showName){
-          p<-p+geom_label(data=clusterNames,aes(x=medX,y=medY,label=tsneClusterNames),col="blue",size=3,check_overlap=TRUE,fontface="bold")
-        }
-      }
-      p
+      values$tsnePlot<-p
     }else{
       NULL
     }
   })
   
-  #checkbox indidicating whether names should be overlain on the t-SNE plot
-  output$overlayNamesCheckbox<-renderUI({
-    if(!is.null(values$tsneObj)){
-      checkboxInput("showName","Overlay cluster names",value=FALSE)
-    }else{
-      NULL
-    }
-  })
-  
-  # Define UI for the little cog wheel by the t-SNE plot
-  # It will depend on the optimal parameters
-  output$plotOptions<-renderUI({
+  output$tsnePlot<-renderPlot({
+    p<-values$tsnePlot #plot will automatically be NULL if there's nothing there
     
-    if(!is.null(values$corpus$tsneClusterNames)){
-      dropdownButton(
-        tags$h3("Change plot parameters"),
-        p("Change Graph Appearance"),
-        checkboxInput("showName","Overlay cluster names",value=FALSE),
-        p("tsne parameters"),
-        selectInput(inputId = 'xcol', label = 'X Variable', choices = names(iris)),
-        br(),
-        br(),
-        p("hbscan parameters"),
-        selectInput(inputId = 'ycol', label = 'Y Variable', choices = names(iris), selected = names(iris)[[2]]),
-        sliderInput(inputId = 'clusters', label = 'Cluster count', value = 3, min = 1, max = 9),
-        circle = TRUE, status = "danger", icon = icon("gear"), width = "300px",
-        tooltip = tooltipOptions(title = "Click to see inputs !")
-      )
-      
-     }else{
-      NULL
+    if(!is.null(values$tsnePlot)){
+  
+      #add the labels to the plot if needed
+      if(!is.null(input$clustButtonSelect)){
+        df<-values$corpus
+        
+        #seperate data object for cluster names
+        clusterNames <- df %>%
+          dplyr::group_by(tsneClusterNames) %>%
+          dplyr::summarise(medX = median(tsneComp1),
+                           medY = median(tsneComp2)) %>%
+          dplyr::filter(tsneClusterNames != "Noise")
+          
+          clusterNames<-clusterNames %>%
+          filter(tsneClusterNames %in% input$clustButtonSelect)
+          
+          #add labels to the plot
+          p<-p+geom_label(data=clusterNames,aes(x=medX,y=medY,label=tsneClusterNames),col="blue",size=3,check_overlap=TRUE,fontface="bold")
+      }
     }
+    
+    p
+  })
+  
+
+  # in cluster details box, plot that shows topic membership over time
+  #finally make a plot to show cluster growth over time
+  output$clusterDetailsGrowth<-renderPlot({
+    detPlot<-NULL
+    
+    if(!is.null(values$tsneObj) & !is.null(input$clustDetails) & !is.null(input$clustButtonSelect)){
+      detPlot<-values$corpus %>%
+        filter(tsneClusterNames == input$clustDetails) %>%
+        ungroup()%>%
+        group_by(YearPub)%>%
+        count()%>%
+        ggplot(aes(x=YearPub,y=n))+
+        geom_bar(stat="identity")+
+        labs(title="Cluster Membership Over Time",
+             xlab = "#of articles published",
+             ylab = "Year of Publication")+
+        scale_x_continuous(limits=c(min(values$corpus$YearPub),max(values$corpus$YearPub)))+
+        theme_bw()
+    }
+    
+    detPlot
   })
   
   
@@ -650,5 +750,18 @@ shinyServer(function(input, output,session) {
 </p>
            </div>")
   })
+  
+  #cluster info box
+  output$clustTopicBoxInfo<-renderUI({
+    info<-NULL
+    
+    if(!is.null(values$tsneObj)){
+     info<- HTML("<h4>All Clusters</h4> <em>Topic clusters (and their total number of members) are listed below. You can click on a cluster topic button (below) to show where it is on the adjacent plot. When you double click a cluster name on the plot, you can see details about that cluster in the 'cluster details' box below.<em>")
+    } 
+    
+    info
+  })
 
 })
+
+

@@ -1,19 +1,20 @@
 #find the largest cluster that is near where a participant is mousing
-hoveredClusterSum<-function(corpus =NULL, e = NULL){
+clickedClusterSum<-function(corpus =NULL, e = NULL){
   if(!is.null(e)){
-    hovPts<-brushedPoints(corpus, e, xvar = "tsneComp1", yvar = "tsneComp2")
+    selPts<-nearPoints(corpus, e, threshold=10,xvar = "tsneComp1", yvar = "tsneComp2")
     
-    if(nrow(hovPts)>0){
+    if(nrow(selPts)>0){
       #get the most common cluster in hovPts
-      tmp<-hovPts %>%
+      tmp<-selPts %>%
         group_by(tsneClusterNames)%>%
         dplyr::count()%>%
-        arrange(-n)
+        ungroup()%>%
+        top_n(1,-n)
       
-      tmp<-corpus %>% 
-        filter(tsneClusterNames == tmp$tsneClusterNames[1])%>%
-        group_by(tsneClusterNames)%>% #this is literally *just* to keep the stupid name
-        dplyr::count()
+      #tmp<-corpus %>% 
+      #  filter(tsneClusterNames == tmp$tsneClusterNames[1])%>%
+      #  group_by(tsneClusterNames)%>% #this is literally *just* to keep the stupid name
+      #  dplyr::count()
       
       return(tmp)
     }else{
@@ -26,11 +27,14 @@ hoveredClusterSum<-function(corpus =NULL, e = NULL){
 
 
 #Print a summary of cluster text
-clusterSummaryText<-function(tmp = NULL){
-  hovMsg<-HTML("<em>Brush (drag mouse to form box)</em> over points in the <em>cluster graph (left)</em> to get summary information about the cluster")
+clusterSummaryText<-function(corpus = NULL,clustSelected=NULL){
+  #hovMsg<-HTML("<em>Brush (drag mouse to form box)</em> over points in the <em>cluster graph (left)</em> to get summary information about the cluster")
+  
+  tmp <- corpus %>%
+    filter(tsneClusterNames == clustSelected)
   
   if(!is.null(tmp)){
-    hovMsg<-HTML(sprintf("<h4><em> Cluster Name</em></h4>Cluster <strong>%s</strong> has <strong>%d</strong> members<br>",tmp$tsneClusterNames[1],tmp$n[1]))
+    hovMsg<-sprintf("<h4><em> %s</em></h4>Cluster <strong>%s</strong> has <strong>%d</strong> members<br>",clustSelected,clustSelected,nrow(tmp))
   }
   
   return(hovMsg)
@@ -38,13 +42,12 @@ clusterSummaryText<-function(tmp = NULL){
 
 
 #get some highly cited (by PMC internal count) papers from a cluster
-getTopPapers<-function(corpus=NULL,hoveredCluster=NULL){
+getTopPapers<-function(corpus=NULL,selectedCluster=NULL){
   topPapers<-""
-  if(!is.null(hoveredCluster)){
-    topRef<-corpus %>%
-      filter(tsneClusterNames %in% hoveredCluster$tsneClusterNames[1]) %>%
-      mutate(pmcCitationCount = as.numeric(as.character(pmcCitationCount)))%>% #for some reason, this is a factor..
-      filter(!is.na(pmcCitationCount))
+  topRef<-corpus %>%
+    filter(tsneClusterNames == selectedCluster) %>%
+    mutate(pmcCitationCount = as.numeric(as.character(pmcCitationCount)))%>% #for some reason, this is a factor..
+    filter(!is.na(pmcCitationCount))
     
     
     if(nrow(topRef)>0){
@@ -71,9 +74,8 @@ getTopPapers<-function(corpus=NULL,hoveredCluster=NULL){
       })
       
       topPapers<-paste0(topPaperText,collapse="<br><br>")
-      topPapers<-HTML(sprintf("<h4><em> Top Papers: </em></h4> %s",topPapers))
+      topPapers<-sprintf("<h4><em> Top Papers: </em></h4> %s",topPapers)
     }
-  }
   
   return(topPapers)
 }
@@ -100,15 +102,9 @@ getTopTerms<-function(clustPMID=NULL,topNVal=1,clustValue = NA,tidyCorpus = NULL
 }
 
 #top terms in each cluster
-topClustTerms<-function(corpus = NULL,corpusTidy=NULL,hoveredCluster = NULL){
-  if(is.null(hoveredCluster)){
-    NULL
-  }else{
-    
-    #Find docs in cluster
-    clustVal<-hoveredCluster$tsneClusterNames[1]
-    pmids<-filter(corpus,tsneClusterNames %in% clustVal)%>%
-      select(PMID)
+topClustTerms<-function(corpus = NULL,corpusTidy=NULL,selectedCluster = NULL){
+
+  pmids<-corpus %>% filter(tsneClusterNames == selectedCluster)%>% select(PMID)
     
     df<-corpusTidy %>%
       filter(PMID %in% pmids$PMID) %>% 
@@ -120,6 +116,5 @@ topClustTerms<-function(corpus = NULL,corpusTidy=NULL,hoveredCluster = NULL){
       top_n(10)
     
     topTerms<-paste(as.character(df$wordStemmed),collapse =",")
-    return(HTML(sprintf("<h4><em> Top Terms </em><br></h4> %s </br>",topTerms)))
-  }
+    return(sprintf("<h4><em> Top Terms </em><br></h4> %s </br>",topTerms))
 }

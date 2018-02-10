@@ -47,7 +47,7 @@ optimalParam<-function(corpus=NULLL){
   if(nDocs>50 & nDocs<100){
     minPtsVals<-c(5,10,20,30,50)
   }else if(nDocs>100 & nDocs<500){
-    minPtsVals<-minPtsVals[1:(length(minPtsVals)-2)]
+    minPtsVals<-c(5,minPtsVals[1:(length(minPtsVals)-2)])
   }else if(nDocs>500 & nDocs<1000){
     minPtsVals<-c(minPtsVals,500) #trying out a bunch of different values
   }else if(nDocs > 1000){
@@ -127,8 +127,6 @@ runOptPotential<-function(corpus=NULL,minPt=NULL){
       return(NULL)   
     }
     
-    
-    
     #combine info across runs
     tmp<-data.frame(PMID = as.character(corpus$PMID),
                     cluster = cl$cluster,
@@ -139,7 +137,7 @@ runOptPotential<-function(corpus=NULL,minPt=NULL){
                     tsneComp2 = corpus$tsneComp2)
     
     
-    #visualize the clusters for this run
+    #visualize the clusters for this run, store this because it's useful for debugging
     clusterNames <- tmp %>%
       dplyr::group_by(cluster) %>%
       dplyr::summarise(medX = median(tsneComp1),
@@ -152,15 +150,18 @@ runOptPotential<-function(corpus=NULL,minPt=NULL){
       stat_ellipse()+
       theme_bw()
     
+    #Essentially fit two linear regression model for each tsne component co-ordinates
+    #and pick the model with the best adjusted R^2 and lowest BIC
+    browser()
     analysisMat<-tmp%>%
       ungroup()%>%
-      filter(clusterName !="clust0")%>%
-      select(tsneComp1,tsneComp2,clusterName,clustMembership) %>%
+      filter(clusterName !="clust0")%>% 
+      select(PMID,tsneComp1,tsneComp2,clusterName,clustMembership) %>% 
       tidyr::spread(clusterName,clustMembership,fill=0) #note the implicit sort, which is bad...
     
     colInfo<-colnames(analysisMat)
-    f1 <- as.formula(paste('tsneComp1 ~', paste(colInfo[3:length(colInfo)], collapse='+')))
-    f2 <- as.formula(paste('tsneComp2 ~', paste(colInfo[3:length(colInfo)], collapse='+')))
+    f1 <- as.formula(paste('tsneComp1 ~', paste(colInfo[4:length(colInfo)], collapse='+')))
+    f2 <- as.formula(paste('tsneComp2 ~', paste(colInfo[4:length(colInfo)], collapse='+')))
     
     tst1<-lm(f1,analysisMat)
     tst2<-lm(f2,analysisMat)
@@ -169,59 +170,9 @@ runOptPotential<-function(corpus=NULL,minPt=NULL){
     
     R2<-summary(tst1)$adj.r.squared *   summary(tst2)$adj.r.squared
     
+    #return the results
     return(list(regSum=R2,fitPlot=p,BIC = BIC,minPt=minPt,fitPlot=p,clRes=cl))
     
-    #return(list(regSum=regAttemptSum,reg=regAttempt,fitPlot=p,silInfo = silSum ,BIC = regAttemptBIC,minPt=minPt,clRes=cl))
-    
-    # #speed this up by sampling only the minimum # of points per cluster
-    # #now create a subset
-    # tmpSub<-tmp %>%
-    #   filter(cluster!=0)%>% #will limit the amount of noise included
-    #   group_by(clusterName)%>%
-    #   sample_frac(0.2)
-    # 
-    # #noise can often be very, and slow down the computation, so I will limit the amount of noise included
-    # sampNoiseMax<-ifelse(sum(tmp$cluster==0)>100,100,sum(tmp$cluster==0))
-    # tmpSubNoise<- tmp %>%
-    #   filter(cluster==0)%>%
-    #   sample_n(sampNoiseMax)
-    # 
-    # tmpSub<-full_join(tmpSub,tmpSubNoise)
-    # remove(tmpSubNoise)
-    # gc()
-    # 
-    # ptTsne<-cbind(tmpSub$tsneComp1,tmpSub$tsneComp2)
-    # ptDist<-dist(ptTsne)
-    # 
-    # #use silhouette width as the univariate measure to the regression?
-    # sil<-cluster::silhouette(x=tmpSub$cluster,ptDist)
-    # silSum<-summary(sil)
-    # 
-    # tmpSub$sil_width <- sil[,3] #sil width for inividuals points
-    # 
-    # #it's hard for this data to be normal and get a good lm response,
-    # #so I am going to make it logistic regresion
-    # # 1= happily in a cluster 0=not happily in a cluster
-    # # I am choose an arbitraty threshold of 0.4 score or higher
-    # # It's not a probability but a score..
-    # 
-    # 
-    # analysisMat<-tmpSub%>%
-    #   ungroup()%>%
-    #   select(PMID,sil_width_box,clusterName,clustMembership) %>%
-    #   tidyr::spread(clusterName,clustMembership,fill=0) #note the implicit sort, which is bad...
-    # 
-    # f <- as.formula(paste('sil_width ~', paste(colInfo[3:length(colInfo)], collapse='+')))
-    # #run a multivariate regression
-    # colInfo<-colnames(analysisMat)
-    # #usually noise resolveds to nothing, so don't include that, clust the clustered stuff
-    # f <- as.formula(paste('sil_width ~', paste(colInfo[3:length(colInfo)], collapse='+')))
-    # 
-    # regAttempt<-lrm(f,data = analysisMat)
-    # regAttemptSum<-summary(regAttempt)
-    # regAttemptBIC<-BIC(regAttempt)
-    # 
-    # return(list(regSum=regAttemptSum,reg=regAttempt,fitPlot=p,silInfo = silSum ,BIC = regAttemptBIC,minPt=minPt,clRes=cl))
 }
 
 
@@ -244,6 +195,97 @@ getTopTerms<-function(clustPMID=NULL,topNVal=1,clustValue = NA,tidyCorpus = NULL
   # return character and collapse top terms (useful in even of a tie)
   topWord<-paste0(topWord$wordStemmed,collapse = "-")
   return(topWord)
+}
+
+
+
+
+#the task of searching for the optimal parameters
+#altnerative and experimental version
+runOptPotentialAlt<-function(corpus=NULL,minPt=NULL){
+  
+  cl<-runHDBSCAN(corpus,minPt) 
+  # usually once everything gets classified as noise there isn't 
+  # much point in continuing. 
+  if(length(unique(cl$cluster))==1){
+    #stopping because there is not point!
+    return(NULL)   
+  }
+  
+  
+  #combine info across runs
+  tmp<-data.frame(PMID = as.character(corpus$PMID),
+                  cluster = cl$cluster,
+                  clusterName = paste0("clust",cl$cluster,sep=""),
+                  clustMembership= cl$membership,
+                  clustOuterlier = cl$outlier_scores,
+                  tsneComp1 = corpus$tsneComp1,
+                  tsneComp2 = corpus$tsneComp2)
+  
+  
+  #visualize the clusters for this run
+  clusterNames <- tmp %>%
+    dplyr::group_by(cluster) %>%
+    dplyr::summarise(medX = median(tsneComp1),
+                     medY = median(tsneComp2)) %>%
+    dplyr::filter(cluster != 0)
+  
+  p<-ggplot(tmp,aes(x=tsneComp1,y=tsneComp2,group=cluster))+
+    geom_point(alpha=0.2)+
+    geom_label(data=clusterNames,aes(x=medX,y=medY,label=cluster),size=2,colour="red")+
+    stat_ellipse()+
+    theme_bw()
+  
+
+    #speed this up by sampling only the minimum # of points per cluster
+  #now create a subset
+  tmpSub<-tmp %>%
+    filter(cluster!=0)%>% #will limit the amount of noise included
+    group_by(clusterName)%>%
+    sample_frac(0.2)
+
+  #noise can often be very, and slow down the computation, so I will limit the amount of noise included
+  sampNoiseMax<-ifelse(sum(tmp$cluster==0)>100,100,sum(tmp$cluster==0))
+  tmpSubNoise<- tmp %>%
+    filter(cluster==0)%>%
+    sample_n(sampNoiseMax)
+
+  tmpSub<-full_join(tmpSub,tmpSubNoise)
+  remove(tmpSubNoise)
+  gc()
+
+  ptTsne<-cbind(tmpSub$tsneComp1,tmpSub$tsneComp2)
+  ptDist<-dist(ptTsne)
+
+  #use silhouette width as the univariate measure to the regression?
+  sil<-cluster::silhouette(x=tmpSub$cluster,ptDist)
+  silSum<-summary(sil)
+
+  tmpSub$sil_width <- sil[,3] #sil width for inividuals points
+
+  #it's hard for this data to be normal and get a good lm response,
+  #so I am going to make it logistic regresion
+  # 1= happily in a cluster 0=not happily in a cluster
+  # I am choose an arbitraty threshold of 0.4 score or higher
+  # It's not a probability but a score..
+
+
+  analysisMat<-tmpSub%>%
+    ungroup()%>%
+    select(PMID,sil_width_box,clusterName,clustMembership) %>%
+    tidyr::spread(clusterName,clustMembership,fill=0) #note the implicit sort, which is bad...
+
+  f <- as.formula(paste('sil_width ~', paste(colInfo[3:length(colInfo)], collapse='+')))
+  #run a multivariate regression
+  colInfo<-colnames(analysisMat)
+  #usually noise resolveds to nothing, so don't include that, clust the clustered stuff
+  f <- as.formula(paste('sil_width ~', paste(colInfo[3:length(colInfo)], collapse='+')))
+
+  regAttempt<-lrm(f,data = analysisMat)
+  regAttemptSum<-summary(regAttempt)
+  regAttemptBIC<-BIC(regAttempt)
+
+  return(list(regSum=regAttemptSum,reg=regAttempt,fitPlot=p,silInfo = silSum ,BIC = regAttemptBIC,minPt=minPt,clRes=cl))
 }
 
 
