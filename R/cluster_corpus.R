@@ -152,7 +152,7 @@ runOptPotential<-function(corpus=NULL,minPt=NULL){
     
     #Essentially fit two linear regression model for each tsne component co-ordinates
     #and pick the model with the best adjusted R^2 and lowest BIC
-    browser()
+    
     analysisMat<-tmp%>%
       ungroup()%>%
       filter(clusterName !="clust0")%>% 

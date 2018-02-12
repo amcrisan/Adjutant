@@ -48,6 +48,14 @@ updateSearchInput <- function (session, inputId, value = NULL) {
 }
 
 
+# #custom update to checkboxGroupButtons so that I can get the deselect button to work
+updatecheckboxGroupButtons_Custom <- function (session, inputId, value = NULL) {
+ message <- list(selected = value)
+ session$sendInputMessage(inputId, message)
+}
+
+
+
 ## START THE SHOW
 shinyServer(function(input, output,session) {
 
@@ -67,6 +75,10 @@ shinyServer(function(input, output,session) {
     tsneObj = NULL,
     analysisProgress = FALSE,
     tnsePlot = NULL,
+    pTsneFinal=NULL, #an analysis version of tsnePlot which allows select/deselect buttons to work,
+    clustInfoDetailsUI = NULL,
+    clustInfoClustOverview = NULL,
+    clustInfoDetailsPlot = NULL,
     fileName = format(Sys.time(), "%Y-%m-%d_%H-%M")
   )
 
@@ -215,6 +227,13 @@ shinyServer(function(input, output,session) {
       })
       
       
+      #save the cluster names data frame so I don't constantly recompute it
+      values$clusterNames <- values$corpus %>%
+        dplyr::group_by(tsneClusterNames) %>%
+        dplyr::summarise(medX = median(tsneComp1),
+                         medY = median(tsneComp2)) %>%
+        dplyr::filter(tsneClusterNames != "Noise")
+      
       #if not the demo version, save the tsne, cluster object for further analysis
       if(!(demoVersion)){
         savedFileName<-paste("./storedRuns/", "TSNE_temporaryStorage.RDS", sep = "")
@@ -261,11 +280,16 @@ shinyServer(function(input, output,session) {
       values$subset <- NULL
       values$tsneObj <- NULL
       values$analysisProgress <- FALSE
+      values$clusterNames<-NULL
       values$tsnePlot<-NULL
+      values$pTsneFinal<-NULL
       
+      #update some straggling widgets
       updateTabsetPanel(session, "sidebarTabs", selected = "searchIn")
       
       updateSearchInput(session,"searchQuery",value = "")
+      
+      updatecheckboxGroupButtons_Custom(session,"searchQuery",NULL)
     }
     
   })
@@ -375,22 +399,16 @@ shinyServer(function(input, output,session) {
   #checkbox to select all clusters
   output$showAllClustNames<-renderUI({
     if(!is.null(values$tsneObj)){
-      actionButton("showAllClust",label="Select All Topic Clusters")
+      fluidRow(
+        actionButton("showAllClust",label="Select All Topic Clusters"),
+        actionButton("deselectAllClust",label="Deselect All Topic Clusters")
+      )
     }else{
       NULL
     }
   })
-  
-  # if the select all clusters checkbox is clicked, then update clustButtonSelect
-  observeEvent(input$showAllClust,{
-    clustName<-values$corpus %>%
-      select(tsneClusterNames)%>%
-      unique()
-      
-    updateCheckboxGroupButtons(session,"clustButtonSelect",selected=clustName$tsneClusterNames)
-  })
-  
 
+  
   
   # Define UI for the little cog wheel by the t-SNE plot
   # It will depend on the optimal parameters
@@ -416,30 +434,39 @@ shinyServer(function(input, output,session) {
     }
   })
   
+  
+  ### GENERATION ALL OF THE CLUSTER DETAILS AND STORING THEM AS NEED
+
   # In the topic cluster tab, and when the user brushes
   # over points in the tsnePlot, populate a 
   # box with some information about the cluster.
   # That informaiton is: the name of the cluster,
   # the top-ten most frequently occuring words
   # and the 5 most cited papers (according to pubmed PMC)
-  
-  output$clusterSelect<-renderUI({
-    if(!is.null(input$clustButtonSelect)){
-      #remove holder overs from previous analysis
-      if(is.null(values$tsneObj)){
-        HTML("To get cluster details, select some cluster(s) by <em>clicking on the topic buttons</em>")
+  #gotta generate it this way for deselect all to work
+  observe({
+    #The dropbdown box
+    if(!is.null(values$tsneObj)){
+      if(!is.null(input$clustButtonSelect)){
+        values$clustInfoDetailsUI<-selectInput("clustDetails", "Choose a cluster", choices= input$clustButtonSelect, multiple=FALSE)
       }else{
-        selectInput("clustDetails", "Choose a cluster", choices= input$clustButtonSelect, multiple=FALSE)
+        values$clustInfoDetailsUI<- HTML("To get cluster details, select some cluster(s) by <em>clicking on the topic buttons</em>.")
       }
     }else{
-      HTML("To get cluster details, select some cluster(s) by <em>clicking on the topic buttons</em>")
+      values$clustInfoDetailsUI<-HTML("Before you can see cluster details, you need clusters! Click on the 'initate topic clustering' button to get started")
     }
+
+  })
+  # 
+  #This actually works, and I am aghast!
+  output$clusterSelect<-renderUI({
+    values$clustInfoDetailsUI
   })
   
   #show detailed cluster information on selections
-  output$clusterDetails<-renderUI({
+  
+  observe({
     clustInfo<-NULL
-    
     if(!is.null(values$tsneObj)){
       if(!is.null(input$clustDetails) & !is.null(input$clustButtonSelect)){
         #when there is a reset event
@@ -454,7 +481,12 @@ shinyServer(function(input, output,session) {
       }
     }
     
-    clustInfo
+    values$clustInfoClustOverview<-clustInfo
+  })
+  
+  #and now, output the cluster details
+  output$clusterDetails<-renderUI({
+    values$clustInfoClustOverview
   })
   
   output$clusterDetailsNote<-renderUI({
@@ -656,42 +688,80 @@ shinyServer(function(input, output,session) {
         theme(legend.position = "bottom",legend.text = element_text(size=14))
       
       values$tsnePlot<-p
+      values$pTsneFinal<-p #for the selectall /deselect all button to work properly
     }else{
       NULL
     }
   })
   
-  output$tsnePlot<-renderPlot({
-    p<-values$tsnePlot #plot will automatically be NULL if there's nothing there
-    
-    if(!is.null(values$tsnePlot)){
+  #This is a silly way to make the deselect / select buttons work
+  #for showing cluster labels
+  #show base plot if user selects to deselect all cluster names
+  observeEvent(input$deselectAllClust,{
+   values$pTsneFinal<-values$tsnePlot
+   updatecheckboxGroupButtons_Custom(session,"clustButtonSelect",NULL)
+   
+   #This is a bit hacky, but it does work
+   values$clustInfoDetailsUI<-HTML("To get cluster details, select some cluster(s) by <em>clicking on the topic buttons</em>.")
+   #values$clustInfo$detailsUI<-HTML("To get cluster details, select some cluster(s) by <em>clicking on the topic buttons</em>.")
+   values$clustInfoClustOverview<-NULL
+   values$clustInfoDetailsPlot<-NULL
+
+   
+  })
   
-      #add the labels to the plot if needed
-      if(!is.null(input$clustButtonSelect)){
-        df<-values$corpus
-        
-        #seperate data object for cluster names
-        clusterNames <- df %>%
-          dplyr::group_by(tsneClusterNames) %>%
-          dplyr::summarise(medX = median(tsneComp1),
-                           medY = median(tsneComp2)) %>%
-          dplyr::filter(tsneClusterNames != "Noise")
-          
-          clusterNames<-clusterNames %>%
-          filter(tsneClusterNames %in% input$clustButtonSelect)
-          
-          #add labels to the plot
-          p<-p+geom_label(data=clusterNames,aes(x=medX,y=medY,label=tsneClusterNames),col="blue",size=3,check_overlap=TRUE,fontface="bold")
-      }
+  #if user selects all show all labels
+  observeEvent(input$showAllClust,{
+    print("I am here")
+    #updatecheckboxGroupButtons(session,"clustButtonSelect",selected=values$clusterNames$tsneClusterNames)
+    
+    # I have to do this step too because updatecheckboxGroupButton has some quirks
+    # that shiny doesn't seem to respond to (i.e. the dependent widgets don't seem to update)
+    p<-values$tsnePlot
+    
+     if(!is.null(values$tsnePlot) & !is.null(values$clusterNames)){
+       clusterNames<-values$clusterNames
+         p<-p+geom_label(data=clusterNames,aes(x=medX,y=medY,label=tsneClusterNames),col="blue",size=3,check_overlap=TRUE,fontface="bold")
+         
+         #also update the topic buttons
+         updateCheckboxGroupButtons(session,"clustButtonSelect",selected=clusterNames$tsneClusterNames)
+         
+         #also update the dropdown list
+         values$clustInfoDetailsUI<-values$clustInfoDetailsUI<-selectInput("clustDetails", "Choose a cluster", choices= input$clustButtonSelect, multiple=FALSE)
+     }
+     
+     values$pTsneFinal<-p
+    
+})
+  
+  
+  #final show just the ones that the user has selected.
+  observeEvent(input$clustButtonSelect,{
+    p<-values$tsnePlot
+    
+    if(!is.null(input$clustButtonSelect)){
+      clusterNames<-values$clusterNames %>%
+        filter(tsneClusterNames %in% input$clustButtonSelect)
+      
+      #add labels to the plot
+      p<-p+geom_label(data=clusterNames,aes(x=medX,y=medY,label=tsneClusterNames),col="blue",size=3,check_overlap=TRUE,fontface="bold")
     }
+    values$pTsneFinal<-p
+  })
+  
+  
+  #finally send that plot to the UI layer!
+  output$tsnePlot<-renderPlot({
+    p<-values$pTsneFinal #plot will automatically be NULL if there's nothing there
     
     p
   })
   
 
   # in cluster details box, plot that shows topic membership over time
-  #finally make a plot to show cluster growth over time
-  output$clusterDetailsGrowth<-renderPlot({
+  #finally make a plot to show cluster growth over time.
+  #if it seperate observe to deal with the UI resetting properly on deselect
+  observe({
     detPlot<-NULL
     
     if(!is.null(values$tsneObj) & !is.null(input$clustDetails) & !is.null(input$clustButtonSelect)){
@@ -709,7 +779,12 @@ shinyServer(function(input, output,session) {
         theme_bw()
     }
     
-    detPlot
+    values$clustInfoDetailsPlot<-detPlot
+  })
+  
+  #now render it
+  output$clusterDetailsGrowth<-renderPlot({
+    values$clustInfoDetailsPlot
   })
   
   
@@ -731,7 +806,7 @@ shinyServer(function(input, output,session) {
   output$searchResInfoStatement<-renderUI({
     HTML("<b><big>PubMed Search Results</big></b> <a href='#searchResultInfo'data-toggle='collapse'><small><em>(show search result details)</small></em></a>
            <div id='searchResultInfo' class= 'collapse'>
-         Results from your Pubmed search will be displayed here. You can browse and download a table of your search results (referred to as the Document Corpus), or you are view a graphic summary of your results. Once you are satisfied with your search results you can initite an analysis to discover topic clusters within the document corpus.
+         Results from your Pubmed search will be displayed here. You can browse and download a table of your search results (referred to as the Document Corpus), or you are view a graphic summary of your results. You can also initite an analysis to in the 'Topic Discovery' tab to automatically find groups (clusters) of articles that about the same topic.
          </div>")
   })
   
