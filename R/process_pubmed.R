@@ -44,7 +44,7 @@ formatData<-function(ids = NULL){
                       Authors=NULL,
                       Title=NULL,
                       Abstract=NULL,
-                      journalType = NULL,
+                      articleType = NULL,
                       language = NULL,
                       pmcCitationCount = NULL,
                       pmcID = NULL,
@@ -111,14 +111,21 @@ formatData<-function(ids = NULL){
                      Authors=authors,
                      Title=pubResults@ArticleTitle,
                      Abstract=pubResults@AbstractText,
-                     journalType = metadata[,1],
+                     articleType = metadata[,1],
                      language = metadata[,2],
                      pmcCitationCount =metadata[,3],
                      pmcID = metadata[,4],
-                     doi = metadata[,5])
+                     doi = metadata[,5],
+                     stringsAsFactors = FALSE)
     
-    #temp$meshTerms<-pubResults@Mesh
+    
+    #adding those meshTerms
     temp$meshTerms<-meshTerms
+    
+    #finally, clean up the pmcCitationCOunt
+    temp<-temp %>%
+      mutate(pmcCitationCount = ifelse(is.na(pmcCitationCount),0,as.numeric(pmcCitationCount)))
+    
     
     #allData<-rbind(allData,temp)
     
