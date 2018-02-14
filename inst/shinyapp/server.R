@@ -270,12 +270,15 @@ shinyServer(function(input, output,session) {
       
       
       #save the cluster names data frame so I don't constantly recompute it
-      values$clusterNames <- values$corpus %>%
-        dplyr::group_by(tsneClusterNames) %>%
-        dplyr::summarise(medX = median(tsneComp1),
-                         medY = median(tsneComp2)) %>%
-        dplyr::filter(tsneClusterNames != "Noise")
-      
+      withProgress(message = "Naming Clusters",
+                   detail= "Data are now clustered and are being assigned names to make it easier to navigate", value = 0, {
+        incProgress(amount = runif(1,min=0.1,max=0.4)) #doesn't do much but visually pacifying because it looks like things are happening
+        values$clusterNames <- values$corpus %>%
+          dplyr::group_by(tsneClusterNames) %>%
+          dplyr::summarise(medX = median(tsneComp1),
+                           medY = median(tsneComp2)) %>%
+          dplyr::filter(tsneClusterNames != "Noise")
+        })
       if(input$saveAnalysis){
         savedFileName<-paste("./storedRuns/", values$fileName,"_topicClusters.RDS", sep = "")
         saveRDS(values$corpus,file=savedFileName)
@@ -287,54 +290,87 @@ shinyServer(function(input, output,session) {
   #Allowing the user to enter custom tsne parameters, and re-running the results
   observeEvent(input$reanalyze,{
     
-    if(input$tsnePerplexity!=values$tsnePer){
-      browser()
-        #re-run tsne
-        tsneObj<-runTSNE(values$corpusTidy,perplexity = input$tsnePerplexity,check_duplicates=FALSE)
-        tmp<-inner_join(x=values$corpus,y=tsneObj$Y,suffix=c("OLD","NEW"),by="PMID")
-        values$tsneObj<-tsneObj
+    if(input$tsnePerplexity!=values$tsnePer | input$tsneTheta!=values$tsneTheta){
+      paramOK<-TRUE
+      
+      #resetting the global parameters
+      values$tsnePer<-input$tsnePerplexity
+      values$tsneTheta <- input$tsneTheta
+      
+      #re-run tsne
+      withProgress(message = 'Dimensionality Reduction',
+                   detail = "\n Running tsne on tidy corpus document term matrix",value = 0, {
+                     
+          incProgress(amount = runif(1,min=0.1,max=0.4)) #doesn't do much but visually pacifying because it looks like things are happening
+
+          tryCatch({
+            tsneObj<-runTSNE(values$corpusTidy,perplexity = input$tsnePerplexity,check_duplicates=FALSE)
+          },
+          error = function(err){
+            paramOK<<-FALSE
+            sendSweetAlert(
+              session = session,
+              title = "t-SNE perplexity parameter too large!",
+              text = "Please choose a smaller value for the t-SNE perplexity parameter ",
+              type = "error"
+            )
+          })
+         })
+      
+          if(paramOK){
+            tmp<-inner_join(x=values$corpus,y=tsneObj$Y,suffix=c("OLD","NEW"),by="PMID")
+            values$tsneObj<-tsneObj
+            
         
-        values$corpus<- tmp %>%
-          dplyr::select(-contains("OLD"))%>%
-          transform(tsneComp1 = tsneComp1NEW,
-                    tsneComp2 = tsneComp2NEW) %>%
-          dplyr::select(-contains("NEW"))
+            values$corpus<- tmp %>%
+              dplyr::select(-contains("OLD"))%>%
+              transform(tsneComp1 = tsneComp1NEW,
+                        tsneComp2 = tsneComp2NEW) %>%
+              dplyr::select(-contains("NEW"))
+           
         
-        #re-run hbscan optimal params
-        optClusters <- optimalParam(values$corpus)
-        tmp<-inner_join(x=values$corpus,y=optClusters,suffix=c("OLD","NEW"),by="PMID")
-        
-        values$corpus<- tmp %>%
-          dplyr::select(-contains("OLD"))%>%
-          transform(tsneCluster = tsneClusterNEW) %>%
-          dplyr::select(-contains("NEW"))
-        
-        #re-name clusters
-        clustNames<-values$corpus %>%
-          group_by(tsneCluster)%>%
-          mutate(tsneClusterNames = getTopTerms(clustPMID = PMID,clustValue=tsneCluster,topNVal = 2,tidyCorpus=values$corpusTidy)) %>%
-          select(PMID,tsneClusterNames) %>%
-          ungroup()
-        
-        #update document corpus with cluster names
-        tmp<-inner_join(values$corpus,clustNames,by=c("PMID","tsneCluster"),suffix=c("OLD","NEW"))
-        
-        values$corpus<- tmp %>%
-          dplyr::select(-contains("OLD"))%>%
-          transform(tsneClusterNames = tsneClusterNamesNEW) %>%
-          dplyr::select(-contains("NEW"))
-        
-        #saving the clusterNames
-        values$clusterNames <- values$corpus %>%
-          dplyr::group_by(tsneClusterNames) %>%
-          dplyr::summarise(medX = median(tsneComp1),
-                           medY = median(tsneComp2)) %>%
-          dplyr::filter(tsneClusterNames != "Noise")
-       
-        #initize redrawing the plot
-        values$tsnePlot<-NULL
-        remove(tmp)
-        gc()
+          #re-run hbscan optimal params
+          #Using HDBSCAN, identify that optimal parameters for generating clusters
+          withProgress(message = 'Clustering Corpus ', 
+                       detail="\n Running HDBSCAN and finding optimal number of cluster", value = 0, {
+            optClusters <- optimalParam(values$corpus)
+            tmp<-inner_join(x=values$corpus,y=optClusters,suffix=c("OLD","NEW"),by="PMID")
+            
+            incProgress(amount = 0.5)
+            
+            values$corpus<- tmp %>%
+              dplyr::select(-contains("OLD"))%>%
+              transform(tsneCluster = tsneClusterNEW) %>%
+              dplyr::select(-contains("NEW"))
+           })
+          
+          #re-name clusters
+          clustNames<-values$corpus %>%
+            group_by(tsneCluster)%>%
+            mutate(tsneClusterNames = getTopTerms(clustPMID = PMID,clustValue=tsneCluster,topNVal = 2,tidyCorpus=values$corpusTidy)) %>%
+            select(PMID,tsneClusterNames) %>%
+            ungroup()
+          
+          #update document corpus with cluster names
+          tmp<-inner_join(values$corpus,clustNames,by=c("PMID","tsneCluster"),suffix=c("OLD","NEW"))
+          
+          values$corpus<- tmp %>%
+            dplyr::select(-contains("OLD"))%>%
+            transform(tsneClusterNames = tsneClusterNamesNEW) %>%
+            dplyr::select(-contains("NEW"))
+          
+          #saving the clusterNames
+          values$clusterNames <- values$corpus %>%
+            dplyr::group_by(tsneClusterNames) %>%
+            dplyr::summarise(medX = median(tsneComp1),
+                             medY = median(tsneComp2)) %>%
+            dplyr::filter(tsneClusterNames != "Noise")
+         
+          #initize redrawing the plot
+          values$tsnePlot<-NULL
+          remove(tmp)
+          gc()
+          }
         
     }
     
@@ -364,34 +400,85 @@ shinyServer(function(input, output,session) {
   # REACTIVE EVENTS FOR SUBSETTING DATA
   #------------------------------------------------------------------------------------
   observeEvent(input$filterGoButton,{
+    #modify filJournalChoices to actually match
+    filtJournalChoices<-gsub("\\s+\\(n=[0-9]+\\)","",input$filtJournalChoices)
+    filtArticleChoices<-gsub("\\s+\\(n=[0-9]+\\)","",input$filtArticleChoices)
+    
     datSub<-values$corpus %>%
-      filter(journalTopics %in% input$filtJournalChoices)%>%
-      filter(journalTypes %in% input$filtArticleChoices)%>%
-      filter(tsneClusterNames %in% input$filtTopicChoices)%>%
-      filter(YearPub > input$filtYearChoices[1] & YearPub %in% input$filtYearChoices[2])
-    
-    
-    if(input$sampChoices == "random"){
-      datSub<-datSub %>%
-        sample_n(size=input$filtSampleSizeChoice)
+      filter(Journal %in% filtJournalChoices)%>%
+      filter(journalType %in% filtArticleChoices)%>%
+      filter(YearPub >= input$filtYearChoices[1] & YearPub <= input$filtYearChoices[2])
       
-    } else if(input$sampChoices == "randomWeighted")
-      if(input$weightedSampleOptions== "citation"){
-        #calculate weights
-        maxCite<-as.numeric(as.character(datSub$pmcCitationCount))
-        
+    if(!is.null(input$filtTopicChoices)){
+      datSub<-datSub %>%
+        filter(tsneClusterNames %in% input$filtTopicChoices)
+    }
+      
+    
+    #Generating sample weights if weighted sampling is selected
+    if(input$sampleWeight== "citation"){
+      #calculate weights by citation #
+      maxCite<-max(as.numeric(as.character(datSub$pmcCitationCount)),na.rm=TRUE)
         datSub<-datSub %>%
-          mutate(sampWeight = ifelse(is.na(pmcCitationCount),1/maxCite,(as.numeric(as.character(pmcCitationCount))+1)/maxCite)) %>%
-          sample_n(size=input$filtSampleSizeChoice,weight=sampWeight)
-          
-      }else if(input$weightSampleOptions == "recency"){
+          mutate(sampWeight = ifelse(is.na(pmcCitationCount),1/maxCite,(as.numeric(as.character(pmcCitationCount))+1)/maxCite)) 
+      }else if(input$sampleWeight == "recency"){
         maxYear<-max(datSub$YearPub)
         minYear<-min(datSub$YearPub)
         
-        datSub2<-datSub %>%
-          mutate(sampWeight = (YearPub - minYear)+1) %>%
-          sample_n(size=input$filtSampleSizeChoice,weight=sampWeight)
+        datSub<-datSub %>%
+          mutate(sampWeight = (YearPub - minYear)+1)
       }
+    
+    #now sampling
+    
+    if(input$sampChoices == "random"){
+      if(input$sampleWeight !="none"){
+        datSub<-datSub %>%
+          sample_n(size=input$filtSampleSizeChoice,weight=sampWeight)
+      }else{
+        datSub<-datSub %>%
+          sample_n(size=input$filtSampleSizeChoice)
+      }
+      
+    }else if(input$sampChoices == "randomStratified"){
+      groupVal<-"Journal"
+      
+      if(input$stratifiedChoice == "Publication Year"){groupVal<-"YearPub"}
+      if(input$stratifiedChoice == "Topic"){groupVal<-"tsneClusterNames"}
+      
+      #check the input size and and modify as need
+      sizePerGroup<-datSub %>%
+        group_by_(groupVal) %>%
+        count() %>%
+        mutate(groupSampSize = ifelse(n < input$filtSampleSizeChoice,n,input$filtSampleSizeChoice)) %>%
+        dplyr::select_(groupVal,"groupSampSize")
+      
+      
+      if(input$sampleWeight !="none"){
+        datSub<-datSub %>%
+          ungroup()%>% #in case any are left over
+          group_by_(groupVal)%>%
+          nest() %>%
+          inner_join(sizePerGroup) %>%
+          mutate(samp = purrr::map2(data, groupSampSize, sample_n()))%>%
+          mutate(samp = purrr::map2(data, groupSampSize,function(x,y){dplyr::sample_n(x,y,FALSE,weight=sampWeight)} ))%>%
+          select_(groupVal, "samp") %>%
+          unnest()
+      }else{
+        datSub<-datSub %>%
+          ungroup()%>% #in case any are left over
+          group_by_(groupVal)%>%
+          nest() %>%
+          inner_join(sizePerGroup) %>% 
+          mutate(samp = purrr::map2(data, groupSampSize,sample_n))%>%
+          select_(groupVal, "samp") %>%
+          unnest()
+      }    
+    }
+    
+    values$corpusSubset<-datSub
+    remove(datSub)
+    gc()
       
   })
   
@@ -512,18 +599,17 @@ shinyServer(function(input, output,session) {
   # It will depend on the optimal parameters
   output$plotOptions<-renderUI({
     
-    if(!is.null(values$corpus$tsneClusterNames) ){
+    if(!is.null(values$corpus$tsneClusterNames)){
       dropdownButton(
         tags$h3("Change plot parameters"),
+        tag$p("To learn more about t-SNE check out this <a href='https://distill.pub/2016/misread-tsne/' target='_blank'>article on Distill Pub</a>"),
+        br(),
         p("tsne parameters"),
         numericInput("tsnePerplexity",label="Set tsne perplexity parameter",value=30,min=2,max = nrow(values$corpus)/2),
         numericInput("tsneTheta",label="Set tsne theta parameter",value=0.5,min=0,max = 1.0),
         actionButton("reanalyze","Reanalyze"),
-        #p("hbscan parameters"),
-        #selectInput(inputId = 'ycol', label = 'Y Variable', choices = names(iris), selected = names(iris)[[2]]),
-      # sliderInput(inputId = 'clusters', label = 'Cluster count', value = 3, min = 1, max = 9),
-        circle = TRUE, status = "danger", icon = icon("gear"), width = "300px",
-        tooltip = tooltipOptions(title = "Click to see inputs !")
+        circle = TRUE,status = "danger", icon = icon("gear"), width = "350px",
+        tooltip = tooltipOptions(title = "Change the plot parameters!")
       )
       
     }else{
@@ -650,12 +736,27 @@ shinyServer(function(input, output,session) {
   
   # Choice widget: Sampling weighting choices
   output$weightedSampleOptions<-renderUI({
-    if(input$sampChoices=="randomWeighted"){
+    if(input$sampChoices %in% c("random","randomStratified")){
       radioButtons("sampleWeight",
-                   label = "Selected option for  sample weight",
-                   choiceNames = c("PMC Citation - article with higher citations are more likely to be sampled",
+                   label = "Selected option for  sampling weighting",
+                   choiceNames = c("None - all articles are equally likely to be sampled",
+                                   "PMC Citation - articles with higher citations are more likely to be sampled",
                                    "Recency - articles that have been recently published are more likely to be sampled") ,
-                   choiceValues = c("citation","recency"))
+                   choiceValues = c("none","citation","recency"))
+    }else{
+      NULL
+    }
+  })
+  
+  # Choice widget: Sampling weighting choices
+  output$stratifiedSampleOptions<-renderUI({
+    if(input$sampChoices=="randomStratified"){
+      selectInput("stratifiedChoice",
+                  width="100%",
+                  label="Choose one strata",
+                  choices = c("Journal","Topic","Publication Year"),
+                  multiple=FALSE)
+      
     }else{
       NULL
     }
@@ -663,15 +764,10 @@ shinyServer(function(input, output,session) {
   
   #Choice widget: Sampling weighting choices
   output$sampleSize<-renderUI({
-    if(input$sampChoices %in% c("random","randomWeighted")){
+    if(input$sampChoices %in% c("random","randomStratified") & !is.null(values$corpus)){
+    
       numericInput("filtSampleSizeChoice",
-                   label = "Choose the total sample size",
-                   value = round(nrow(values$corpus)/2),
-                   min = 2,
-                   max = nrow(values$corpus))
-    }else if(input$sampeChoices == "randomWeighted"){
-      numericInput("filtSampleSizeChoiceStratified",
-                   label = "Choose the total sample size per strata",
+                   label = "Choose the sample size",
                    value = round(nrow(values$corpus)/2),
                    min = 2,
                    max = nrow(values$corpus))
@@ -814,6 +910,35 @@ shinyServer(function(input, output,session) {
       NULL
     }
   })
+  
+  #Button widget: Apply filters
+  
+  output$filterButton<-renderUI({
+    if(!is.null(values$corpus)){
+      actionButton("filterGoButton",icon=icon("filter"),label="Apply Filters")
+    }else{
+      NULL
+    }
+  })
+  #Button widget: Downloading data
+  output$downloadSubsetData<-renderUI({
+    if(!is.null(values$corpusSubset)){
+      downloadButton("downloadSub", label = "Download Subset")
+    }else{
+      NULL
+    }
+  })
+  
+  # Button widget handler: Downloading data
+  output$downloadSub<- downloadHandler(
+    filename = function() {
+      paste(values$fileName,'_subset','.csv', sep='')
+    },
+    content = function(con) {
+      write.csv(values$corpusSubset, con,quote=TRUE,row.names=FALSE)
+    }
+  )
+  
   
   #------------------------------------------------------------------------------------
   # VISUALIZATIONS

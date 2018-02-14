@@ -113,28 +113,34 @@ body<-dashboardBody(
       br(),
       fluidRow(
         column(7,
-          plotOutput("tsnePlot", dblclick = "plot_dbclick"),
-          uiOutput("plotOptions")
+               shinydashboard::box(title="Cluster Plot",
+                                   id = "clusterPlot",
+                                   width="100%",
+                                   uiOutput("plotOptions"),
+                                   plotOutput("tsnePlot", dblclick = "plot_dbclick"),
+                                   uiOutput("clustTopicBoxInfo"),
+                                   br(),
+                                   uiOutput("showAllClustNames"),
+                                   uiOutput("selectCluster")
+                                 )
         ),
         column(5, 
-               uiOutput("clustTopicBoxInfo"),
-               br(),
-               uiOutput("showAllClustNames"),
-               uiOutput("selectCluster"))
-        ), 
-      shinydashboard::box(title="Cluster Details",
-                          id="exploreClust",
-                          width=NULL,
-                          uiOutput("clusterDetailsNote"),
-                          uiOutput("clusterSelect"),
-                          fluidRow(
-                            column(width=8,
-                                   uiOutput("clusterDetails")),
-                            column(width=4,
-                                   h4(""), #literally just to align it somehwhat with the other box
-                                   plotOutput("clusterDetailsGrowth"))
-                          )
-      )
+               shinydashboard::box(title="Cluster Details",
+                                   id="exploreClust",
+                                   width="100%",
+                                   uiOutput("clusterDetailsNote"),
+                                   uiOutput("clusterSelect"),
+                                   uiOutput("clusterDetails"),
+                                   plotOutput("clusterDetailsGrowth",height="250px"))
+                                   #fluidRow(
+                                   #  column(width=8,
+                                   #        uiOutput("clusterDetails")),
+                                  #   column(width=4,
+                                   #         h4(""), #literally just to align it somehwhat with the other box
+                                  #          plotOutput("clusterDetailsGrowth"))
+                                  # )
+               )   
+        )
               
     ),
     #-------------------
@@ -147,18 +153,26 @@ body<-dashboardBody(
       br(),
       hr(),
       h4("Sampling Approach"),
-      radioButtons("sampChoices",
-                   label="", 
-                   selected = "random",
-                   width ="100%",
-                   choiceNames=c("All - select all documents meeting the filter criteria",
-                                 "Random - randomly select articles that match filter criteria",
-                                 "Random Weighted - randomly select articles that match filter criteria AND give more weight to some articles over others",
-                                 "Random Stratified - random select articles that match the filter criteria AND according to some strata (group)"),
-                   inline=FALSE,
-                   choiceValues = c("all","random","randomWeighted","randomStratified")),
-      uiOutput("sampleSize"),
-      uiOutput("weightedSampleOptions"),
+      fluidRow(
+        column(width=4,
+          radioButtons("sampChoices",
+                       label="Choose a sampling method", 
+                       selected = "random",
+                       width ="100%",
+                       choiceNames=c("All - select all documents meeting the filter criteria",
+                                     "Random - randomly select articles that match filter criteria",
+                                     "Random Stratified - randomly select articles that match the filter criteria AND according to some strata (group)"),
+                       inline=FALSE,
+                       choiceValues = c("all","random","randomStratified"))
+        ),
+        column(width = 4,
+          uiOutput("weightedSampleOptions"),
+          uiOutput("stratifiedSampleOptions")
+        ),
+        column(width = 4,
+          uiOutput("sampleSize")
+        )
+      ),
       hr(),
       h4("Filter Criteria"),
       fillRow(height="2000px", #this is so all drop down menu items fit
@@ -170,8 +184,12 @@ body<-dashboardBody(
                        uiOutput("filtArticleType"),
                        uiOutput("filtMinCitation"),
                        uiOutput("filtTopic")),
-                column(width=1,
-                       actionButton("filterGoButton",icon=icon("filter"),label="Apply Filters")
+                column(width=2,
+                       fluidRow(
+                         uiOutput("filterButton"),
+                         #actionButton("filterGoButton",icon=icon("filter"),label="Apply Filters"),
+                         uiOutput("downloadSubsetData")
+                       )
                 )
       )
       #put the resulting data table here
