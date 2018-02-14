@@ -25,9 +25,6 @@ source("../../R/explore_clusters.R")
 
 set.seed(416) #repping the 6ix! 
 
-#a variable that changes up some parameters depending on whether this is the demo version of the app or not
-demoVersion<-FALSE
-  
 #Query Strings used for testing testing - I use a couple of example here
 queryString<-'"mycobacterium tuberculosis "[All Fields] AND "genome"[All Fields] AND (("2016/01/01"[PDAT] : "2017/10/01"[PDAT]) AND English[lang]) AND (("2016/01/01"[PDAT] : "2017/10/01"[PDAT]) AND English[lang])'
 #queryString<-'"mycobacterium tuberculosis "[All Fields] AND (("2016/10/01"[PDAT] : "2017/10/01"[PDAT]) AND English[lang]) AND (("2016/01/01"[PDAT] : "2017/10/01"[PDAT]) AND English[lang])'
@@ -46,7 +43,6 @@ updateSearchInput <- function (session, inputId, value = NULL) {
   message <- dropNulls(list(value = value))
   session$sendInputMessage(inputId, message)
 }
-
 
 # custom update to checkboxGroupButtons so that I can get the deselect button to work
 updatecheckboxGroupButtons_Custom <- function (session, inputId, value = NULL) {
@@ -74,6 +70,9 @@ shinyServer(function(input, output,session) {
     tsneObj = NULL,
     analysisProgress = FALSE,
     tnsePlot = NULL,
+    tsnePer = 30,
+    tsneTheta = 0.5,
+    hdbscanMinClustSize = NULL,
     fileName = paste(format(Sys.time(), "%Y-%m-%d_%H-%M"),"documentCorpus",sep="_"),
     #------------------------
     # Note to future self 
@@ -158,7 +157,6 @@ shinyServer(function(input, output,session) {
         
         #automatically go to the searchOverview
         updateTabItems(session, "sidebarTabs","searchOverview")
-        browser()
         
       }
       
@@ -195,11 +193,16 @@ shinyServer(function(input, output,session) {
   output$documentTable <- DT::renderDataTable({
     
     if(!is.null(values$corpus)){
-      values$corpus %>%
-        select(-contains("meshTerms"), -contains("Abstract"))
+      #values$corpus %>%
+      #  select(-contains("tsneClusterNames"), -contains("Abstract"))
+      values$corpus[,c("PMID","YearPub","Journal","Authors" ,"Title","doi","journalType","pmcCitationCount","pmcID", "language","Abstract","meshTerms" )]
     }
     
-  },server=TRUE,extensions = c('Responsive','Buttons','FixedHeader'), options = list(
+  },server=TRUE,
+  extensions = c('Responsive','Buttons','FixedHeader'), 
+  options = list(
+    autoWidth = TRUE,
+    columnDefs = list(list(width = '450px', targets = c(4,5))),
     dom = 'Bfrtip',
     buttons = c('csv', 'excel'),
     fixedHeader=TRUE
@@ -223,6 +226,12 @@ shinyServer(function(input, output,session) {
                      
         tidyCorpus_df<-tidyCorpus(values$corpus)
         values$corpusTidy<-tidyCorpus_df
+        
+        if(input$saveAnalysis){
+          savedFileName<-paste("./storedRuns/", values$fileName,"_tidyText.RDS", sep = "")
+          saveRDS(values$corpusTidy,file=savedFileName)
+        }
+        
       })
       #run tSNE the tidy corpus (note the runTSNE fuction 
       # will turn the tidy corpus into a document term matrix)
@@ -267,15 +276,70 @@ shinyServer(function(input, output,session) {
                          medY = median(tsneComp2)) %>%
         dplyr::filter(tsneClusterNames != "Noise")
       
-      #if not the demo version, save the tsne, cluster object for further analysis
       if(input$saveAnalysis){
-        savedFileName<-paste("./storedRuns/", "TSNE_temporaryStorage.RDS", sep = "")
+        savedFileName<-paste("./storedRuns/", values$fileName,"_topicClusters.RDS", sep = "")
         saveRDS(values$corpus,file=savedFileName)
       }
     }
   })
   
 
+  #Allowing the user to enter custom tsne parameters, and re-running the results
+  observeEvent(input$reanalyze,{
+    
+    if(input$tsnePerplexity!=values$tsnePer){
+      browser()
+        #re-run tsne
+        tsneObj<-runTSNE(values$corpusTidy,perplexity = input$tsnePerplexity,check_duplicates=FALSE)
+        tmp<-inner_join(x=values$corpus,y=tsneObj$Y,suffix=c("OLD","NEW"),by="PMID")
+        values$tsneObj<-tsneObj
+        
+        values$corpus<- tmp %>%
+          dplyr::select(-contains("OLD"))%>%
+          transform(tsneComp1 = tsneComp1NEW,
+                    tsneComp2 = tsneComp2NEW) %>%
+          dplyr::select(-contains("NEW"))
+        
+        #re-run hbscan optimal params
+        optClusters <- optimalParam(values$corpus)
+        tmp<-inner_join(x=values$corpus,y=optClusters,suffix=c("OLD","NEW"),by="PMID")
+        
+        values$corpus<- tmp %>%
+          dplyr::select(-contains("OLD"))%>%
+          transform(tsneCluster = tsneClusterNEW) %>%
+          dplyr::select(-contains("NEW"))
+        
+        #re-name clusters
+        clustNames<-values$corpus %>%
+          group_by(tsneCluster)%>%
+          mutate(tsneClusterNames = getTopTerms(clustPMID = PMID,clustValue=tsneCluster,topNVal = 2,tidyCorpus=values$corpusTidy)) %>%
+          select(PMID,tsneClusterNames) %>%
+          ungroup()
+        
+        #update document corpus with cluster names
+        tmp<-inner_join(values$corpus,clustNames,by=c("PMID","tsneCluster"),suffix=c("OLD","NEW"))
+        
+        values$corpus<- tmp %>%
+          dplyr::select(-contains("OLD"))%>%
+          transform(tsneClusterNames = tsneClusterNamesNEW) %>%
+          dplyr::select(-contains("NEW"))
+        
+        #saving the clusterNames
+        values$clusterNames <- values$corpus %>%
+          dplyr::group_by(tsneClusterNames) %>%
+          dplyr::summarise(medX = median(tsneComp1),
+                           medY = median(tsneComp2)) %>%
+          dplyr::filter(tsneClusterNames != "Noise")
+       
+        #initize redrawing the plot
+        values$tsnePlot<-NULL
+        remove(tmp)
+        gc()
+        
+    }
+    
+  })
+  
   # In the t-SNE plot, allow the user to double click on a cluster in order
   # to bring up information about that cluster in the detailed view
   observeEvent(input$plot_dbclick,{
@@ -296,6 +360,40 @@ shinyServer(function(input, output,session) {
     }
   })
 
+  #------------------------------------------------------------------------------------
+  # REACTIVE EVENTS FOR SUBSETTING DATA
+  #------------------------------------------------------------------------------------
+  observeEvent(input$filterGoButton,{
+    datSub<-values$corpus %>%
+      filter(journalTopics %in% input$filtJournalChoices)%>%
+      filter(journalTypes %in% input$filtArticleChoices)%>%
+      filter(tsneClusterNames %in% input$filtTopicChoices)%>%
+      filter(YearPub > input$filtYearChoices[1] & YearPub %in% input$filtYearChoices[2])
+    
+    
+    if(input$sampChoices == "random"){
+      datSub<-datSub %>%
+        sample_n(size=input$filtSampleSizeChoice)
+      
+    } else if(input$sampChoices == "randomWeighted")
+      if(input$weightedSampleOptions== "citation"){
+        #calculate weights
+        maxCite<-as.numeric(as.character(datSub$pmcCitationCount))
+        
+        datSub<-datSub %>%
+          mutate(sampWeight = ifelse(is.na(pmcCitationCount),1/maxCite,(as.numeric(as.character(pmcCitationCount))+1)/maxCite)) %>%
+          sample_n(size=input$filtSampleSizeChoice,weight=sampWeight)
+          
+      }else if(input$weightSampleOptions == "recency"){
+        maxYear<-max(datSub$YearPub)
+        minYear<-min(datSub$YearPub)
+        
+        datSub2<-datSub %>%
+          mutate(sampWeight = (YearPub - minYear)+1) %>%
+          sample_n(size=input$filtSampleSizeChoice,weight=sampWeight)
+      }
+      
+  })
   
   #------------------------------------------------------------------------------------
   # REACTIVE EVENTS TO CLEAR THE PRESENT ANALYSIS 
@@ -414,17 +512,16 @@ shinyServer(function(input, output,session) {
   # It will depend on the optimal parameters
   output$plotOptions<-renderUI({
     
-    if(!is.null(values$corpus$tsneClusterNames)){
+    if(!is.null(values$corpus$tsneClusterNames) ){
       dropdownButton(
         tags$h3("Change plot parameters"),
-        p("Change Graph Appearance"),
         p("tsne parameters"),
-        selectInput(inputId = 'xcol', label = 'X Variable', choices = names(iris)),
-        br(),
-        br(),
-        p("hbscan parameters"),
-        selectInput(inputId = 'ycol', label = 'Y Variable', choices = names(iris), selected = names(iris)[[2]]),
-        sliderInput(inputId = 'clusters', label = 'Cluster count', value = 3, min = 1, max = 9),
+        numericInput("tsnePerplexity",label="Set tsne perplexity parameter",value=30,min=2,max = nrow(values$corpus)/2),
+        numericInput("tsneTheta",label="Set tsne theta parameter",value=0.5,min=0,max = 1.0),
+        actionButton("reanalyze","Reanalyze"),
+        #p("hbscan parameters"),
+        #selectInput(inputId = 'ycol', label = 'Y Variable', choices = names(iris), selected = names(iris)[[2]]),
+      # sliderInput(inputId = 'clusters', label = 'Cluster count', value = 3, min = 1, max = 9),
         circle = TRUE, status = "danger", icon = icon("gear"), width = "300px",
         tooltip = tooltipOptions(title = "Click to see inputs !")
       )
@@ -563,6 +660,27 @@ shinyServer(function(input, output,session) {
       NULL
     }
   })
+  
+  #Choice widget: Sampling weighting choices
+  output$sampleSize<-renderUI({
+    if(input$sampChoices %in% c("random","randomWeighted")){
+      numericInput("filtSampleSizeChoice",
+                   label = "Choose the total sample size",
+                   value = round(nrow(values$corpus)/2),
+                   min = 2,
+                   max = nrow(values$corpus))
+    }else if(input$sampeChoices == "randomWeighted"){
+      numericInput("filtSampleSizeChoiceStratified",
+                   label = "Choose the total sample size per strata",
+                   value = round(nrow(values$corpus)/2),
+                   min = 2,
+                   max = nrow(values$corpus))
+    }else{
+      NULL
+    }
+  })
+  
+  #Choice widget: Sampling weighting choices
   
   #Filter widget: filter by journal
   output$filtJournal<-renderUI({
@@ -865,7 +983,6 @@ shinyServer(function(input, output,session) {
       
       df<-values$corpus
       
-    
       #draw hulls around the clusters
       chulls <- plyr::ddply(df, "tsneClusterNames", function(dat) dat[chull(dat$tsneComp1, dat$tsneComp2), ]) %>%
         select(tsneClusterNames,tsneComp1,tsneComp2) %>%
