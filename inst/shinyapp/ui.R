@@ -11,6 +11,7 @@ body<-dashboardBody(
     tags$link(rel = "stylesheet", type = "text/css", href = "custom.css"),
     tags$style(".ban2 {color:#a14c4c}")
   ),
+  useSweetAlert(),
   tabItems(
     #-------------------
     # About 
@@ -20,7 +21,7 @@ body<-dashboardBody(
       p(HTML("<strong>Search and analyze pubmed results from R</strong><br>"))
     ),
     #-------------------
-    # Search Input
+    # Search Input 
     #-------------------
     tabItem("searchIn",
       uiOutput("searchInfoStatement"),
@@ -36,18 +37,16 @@ body<-dashboardBody(
               btnSearch = icon("search"), 
               btnReset = icon("remove"), 
               width = "100%"
-          ),
-          hr(),
-          #br(),
-          HTML("<em>Search Options</em>"),
-          switchInput(inputId = "saveAnalysis",label="Save Analysis?", value = TRUE),
-          uiOutput("analysisFileName")
+          )
         ),
         tabPanel("Load Data",
-          #p(HTML("Load an RDS file from a previous run.")),
-          fileInput("prevAnalysis", "Load RDS file from previous run (see /priorRuns folder or load example)",width = "100%")
+          fileInput("prevAnalysis", "Load RDS file from previous run (see 'priorRuns' folder or load example)",width = "100%")
         )
-      )
+      ),
+      hr(),
+      HTML("<em>Search Options</em>"),
+      switchInput(inputId = "saveAnalysis",label="Save Analysis?", value = TRUE),
+      uiOutput("analysisFileName")
     ),
     #------------------------------
     # Search Summary & Results
@@ -79,6 +78,7 @@ body<-dashboardBody(
           hr(),
           h4("MeSH Terms over time"),
           em("Medical Subject Heading (MeSH) terms are a controlled vocabulary used by the National Library of Medicine and assigned to articles within PubMed. MeSH terms are intended to give the reader a sense of what a PubMed article is about, but they can sometimes be much to general. For more specific topic suggestions in the article consider initating a topic clustering, from the 'Topic Clustering' menu item to get some more specific and data-driven sense of topics within your documents."),
+          br(),
           fluidRow(
             column(width=8,
                    plotOutput("meshTimePlot",width="100%",height="350px")
@@ -90,6 +90,7 @@ body<-dashboardBody(
           hr(),
           h4("Top 10 Most Referenced Papers"),
           em("Most reference articles according to PubMed Central internal counts, which don't match Google Scholar but are a reasonable heuristic"),
+          br(),
           fluidRow( #largely to keep consistent formatting
             column(width=8,
                    uiOutput("topCorpusArticles")
@@ -120,7 +121,7 @@ body<-dashboardBody(
                br(),
                uiOutput("showAllClustNames"),
                uiOutput("selectCluster"))
-        ), #end of fluid row
+        ), 
       shinydashboard::box(title="Cluster Details",
                           id="exploreClust",
                           width=NULL,
@@ -139,9 +140,40 @@ body<-dashboardBody(
     #-------------------
     # Document Sampling
     #-------------------
-    tabItem("sampleDocs",
-      h1("Document Sampling"),
-      p("Comming soon!")
+    tabItem("docSample",
+      uiOutput("sampleInfoStatement"),
+      hr(class="style-four"), 
+      em("Important! Document sampling is only meant to create a smaller subset of the data that you can download to your computer. Search results and topic discovery will use the full document corpus irrespective of this sampling step. Click on 'show document sampling details' for more information.  "),
+      br(),
+      hr(),
+      h4("Sampling Approach"),
+      radioButtons("sampChoices",
+                   label="", 
+                   selected = "random",
+                   width ="100%",
+                   choiceNames=c("All - select all documents meeting the filter criteria",
+                                 "Random - randomly select articles that match filter criteria",
+                                 "Random Weighted - randomly select articles that match filter criteria AND give more weight to some articles over others"),
+                   inline=FALSE,
+                   choiceValues = c("all","random","randomWeighted")),
+      uiOutput("weightedSampleOptions"),
+      hr(),
+      h4("Filter Criteria"),
+      fillRow(height="2000px", #this is so all drop down menu items fit
+              width="100%",
+              column(width=10,
+                       uiOutput("filtJournal"),
+                       uiOutput("filtIsOpen"),
+                       uiOutput("filtYear"),
+                       uiOutput("filtArticleType"),
+                       uiOutput("filtMinCitation"),
+                       uiOutput("filtTopic")),
+                column(width=1,
+                       actionButton("filterGoButton",icon=icon("filter"),label="Apply Filters")
+                )
+      )
+      #put the resulting data table here
+     
     )
   )
 )
@@ -156,7 +188,7 @@ sideDash<-dashboardSidebar(
     menuItem("Search", tabName = "searchIn", icon = icon("search")),
     menuItemOutput("searchMenu"),
     menuItem("Topic Discovery", tabName = "clusterAnalysis",icon = icon("spinner")),
-    menuItem("Document Sampling", tabName = "docSample",icon=icon("clone")),
+    menuItem("Sample Articles", tabName = "docSample",icon=icon("clone")),
     br(),
     menuItem("Clear Analysis", tabName = "clearAnalysis",icon=icon("ban", class="ban2")),
     br(),

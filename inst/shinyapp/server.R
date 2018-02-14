@@ -48,7 +48,7 @@ updateSearchInput <- function (session, inputId, value = NULL) {
 }
 
 
-# #custom update to checkboxGroupButtons so that I can get the deselect button to work
+# custom update to checkboxGroupButtons so that I can get the deselect button to work
 updatecheckboxGroupButtons_Custom <- function (session, inputId, value = NULL) {
  message <- list(selected = value)
  session$sendInputMessage(inputId, message)
@@ -59,8 +59,7 @@ updatecheckboxGroupButtons_Custom <- function (session, inputId, value = NULL) {
 ## START THE SHOW
 shinyServer(function(input, output,session) {
 
-  #Kill browser deployed app on exit for non-demo version
-  if(!demoVersion){ session$onSessionEnded(stopApp)}
+  session$onSessionEnded(stopApp) #kill the app when the browser is closed
   
   #------------------------------------------------------------------------------------
   # REACTIVE VALUES AND DATA SETS
@@ -71,15 +70,24 @@ shinyServer(function(input, output,session) {
     totalDocs = 0,
     corpus = NULL, #original document corpus 
     corpusTidy = NULL, # tidyText version of corpus
-    subset = NULL,
+    corpusSubset = NULL,
     tsneObj = NULL,
     analysisProgress = FALSE,
     tnsePlot = NULL,
-    pTsneFinal=NULL, #an analysis version of tsnePlot which allows select/deselect buttons to work,
+    fileName = paste(format(Sys.time(), "%Y-%m-%d_%H-%M"),"documentCorpus",sep="_"),
+    #------------------------
+    # Note to future self 
+    #----------------------
+    # Making a 'deselect all' button (in topic discovery tab) work properly 
+    # required some hacks, and the variables below all beginning with
+    # clustInfo (+ the one tsne plot) are the side effects of those hacks. 
+    # So - dear future self, when wondering WTF I made certain
+    # choices, know it was present self's attempts and
+    # ignorance and I'd like to see you do better.
     clustInfoDetailsUI = NULL,
     clustInfoClustOverview = NULL,
     clustInfoDetailsPlot = NULL,
-    fileName = format(Sys.time(), "%Y-%m-%d_%H-%M")
+    pTsneFinal=NULL
   )
 
   #------------------------------------------------------------------------------------
@@ -103,53 +111,77 @@ shinyServer(function(input, output,session) {
   
   # Observe if 'search' button is pushed to initate pubmed query
   observeEvent(input$searchQuery_search,{
-    if(!values$analysisProgress){
+    if(!is.null(input$searchQuery_search)){
       
        withProgress(message = 'Querying Pubmed', value = 0, {
-        df<-processSearch(input$searchQuery,demoVersion) #search pubmed
+         incProgress(amount = runif(1,min=0.1,max=0.4)) #doesn't do much but visually pacifying because it looks like things are happening
+        df<-processSearch(input$searchQuery) #search pubmed
        })
       
-      values$corpus<-df #save corpus
-      values$totalDocs<-nrow(df) #save total # of documents
-      values$analysisProgress<-TRUE #indicate an analysis is now in progress
-      
-      #save file in storedRuns, unless demo (shinyapps.io) version is running
-      if(!demoVersion){ 
-        savedFileName<-paste("./storedRuns/",format(Sys.time(), "%Y-%m-%d_%H-%M"), "_temporaryStorage.RDS", sep = "")
-        saveRDS(df,file=savedFileName)
+      if(!is.null(df)){
+        values$corpus<-df #save corpus
+        values$totalDocs<-nrow(df) #save total # of documents
+        values$analysisProgress<-TRUE #indicate an analysis is now in progress
+        
+        #if an alternative analysis name is provided
+        if(input$analysisName != values$fileName){
+          analysisName<-gsub("\\s+","_",input$analysisName)
+          values$fileName<-paste(analysisName,"documentCorpus",sep="_")
+        }
+        
+        # check if the  user entered a file name
+        if(input$saveAnalysis){ 
+          savedFileName<-paste("./storedRuns/", values$fileName,".RDS", sep = "")
+          saveRDS(df,file=savedFileName)
+        }
+        
+        #automatically go to the searchOverview
+        updateTabItems(session, "sidebarTabs","searchOverview")
       }
-    }else{
-      print("Please clear previous analysis before starting a new one")
     }
-    
-    #automatically go to the searchOverview
-    updateTabItems(session, "sidebarTabs","searchOverview")
     
   })
   
-  # OPTION 2: Users load PREVIOUS data
+  # OPTION 2: Users load PREVIOUS accepts only RDA files
   # populate the dataset based upon uploading previous file
+  # throw an error if the input data is not RDA
+  # TO DO: BE A BIT STRICTER OF WHAT PEOPLE CAN INCLUDE
   observeEvent(input$prevAnalysis,{
     if(!values$analysisProgress){
       
       if(!is.null(input$prevAnalysis)){
         
-        #df<-readRDS(paste("./storedRuns/",input$prevAnalysis$name,sep=""))
         df<-readRDS(input$prevAnalysis$datapath)
         values$corpus<-df
         values$totalDocs<-nrow(df)
         values$analysisProgress <-TRUE
         
+        #automatically go to the searchOverview
+        updateTabItems(session, "sidebarTabs","searchOverview")
+        browser()
+        
       }
       
-    }else{
-      print("Please clear previous analysis before starting a new one")
     }
     
-    #automatically go to the searchOverview
-    updateTabItems(session, "sidebarTabs","searchOverview")
   })
   
+  #load a warning if the user wants to search/load something else but already has an analysis in progress
+  observeEvent(input$sidebarTabs,{
+    if(input$sidebarTabs == "searchIn"){
+      if(values$analysisProgress){
+        sendSweetAlert(
+          session = session, 
+          title = "Please Clear Analysis First!", 
+          text = "Please clear the current analysis (see option in sidebar panel)  before entering a new search term or loading a previous analysis (don't worry, all data from you current analysis is automatically saved in the 'prior runs' folder", 
+          type = "error"
+        )
+        
+        #automatically go to the searchOverview
+        updateTabItems(session, "sidebarTabs","searchOverview")
+      }
+    }
+  })
   
   
   ##########################################
@@ -185,9 +217,9 @@ shinyServer(function(input, output,session) {
       
       # convert to document corpus to tidy text format
       withProgress(message = 'Making corpus tidy', 
-                   detail = "\n Cleaning up the text data, removing stop words, calcuting td_idf metric, removing very common words", value = 0, {
+                  detail = "\n Cleaning up the text data, removing stop words, calcuting td_idf metric, removing very common words", value = 0, {
         
-        incProgress(amount = 0.2) #doesn't do much but visually pacifying
+      incProgress(amount = runif(1,min=0.1,max=0.4)) #doesn't do much but visually pacifying because it looks like things are happening
                      
         tidyCorpus_df<-tidyCorpus(values$corpus)
         values$corpusTidy<-tidyCorpus_df
@@ -195,9 +227,9 @@ shinyServer(function(input, output,session) {
       #run tSNE the tidy corpus (note the runTSNE fuction 
       # will turn the tidy corpus into a document term matrix)
       withProgress(message = 'Dimensionality Reduction',
-                   detail = "Running tsne on tidy corpus document term matrix",value = 0, {
+                   detail = "\n Running tsne on tidy corpus document term matrix",value = 0, {
                      
-        incProgress(amount = 0.2) #doesn't do much but visually pacifying
+        incProgress(amount = runif(1,min=0.1,max=0.4)) #doesn't do much but visually pacifying because it looks like things are happening
                      
         tsneObj<-runTSNE(tidyCorpus_df,check_duplicates=FALSE)
         values$tsneObj<-tsneObj
@@ -208,14 +240,15 @@ shinyServer(function(input, output,session) {
       
       #Using HDBSCAN, identify that optimal parameters for generating clusters
       withProgress(message = 'Clustering Corpus ', 
-                   detail="Running HDBSCAN and finding optimal number of cluster", value = 0, {
+                   detail="\n Running HDBSCAN and finding optimal number of cluster", value = 0, {
         optClusters <- optimalParam(values$corpus)
         values$corpus<-inner_join(values$corpus,optClusters,by="PMID")
       })
       
       #name clusters according to top-two terms appear in cluster
-      withProgress(message = "Namiing Clusters",
+      withProgress(message = "Naming Clusters",
                    detail= "Data are now clustered and are being assigned names to make it easier to navigate", value = 0, {
+        incProgress(amount = runif(1,min=0.1,max=0.4)) #doesn't do much but visually pacifying because it looks like things are happening
         clustNames<-values$corpus %>%
           group_by(tsneCluster)%>%
           mutate(tsneClusterNames = getTopTerms(clustPMID = PMID,clustValue=tsneCluster,topNVal = 2,tidyCorpus=tidyCorpus_df)) %>%
@@ -235,20 +268,16 @@ shinyServer(function(input, output,session) {
         dplyr::filter(tsneClusterNames != "Noise")
       
       #if not the demo version, save the tsne, cluster object for further analysis
-      if(!(demoVersion)){
+      if(input$saveAnalysis){
         savedFileName<-paste("./storedRuns/", "TSNE_temporaryStorage.RDS", sep = "")
         saveRDS(values$corpus,file=savedFileName)
       }
-      
-      #Update the tabset panel to corpus view
-      updateTabsetPanel(session, "overviewPanel",
-                        selected = "Corpus Structure"
-      )
-      
     }
   })
   
 
+  # In the t-SNE plot, allow the user to double click on a cluster in order
+  # to bring up information about that cluster in the detailed view
   observeEvent(input$plot_dbclick,{
     if(!is.null(input$plot_dbclick)){
       clickedClust<-clickedClusterSum(values$corpus,input$plot_dbclick)
@@ -295,14 +324,42 @@ shinyServer(function(input, output,session) {
   })
   
   #------------------------------------------------------------------------------------
-  # UI ELEMENTS (WIDGETS, MENUS) THAT ARE DATA DEPENDENT 
+  # UI ELEMENTS (WIDGETS, MENUS, SUMMARY TEXT STATEMENTS, BOXES) THAT ARE DATA DEPENDENT 
   #------------------------------------------------------------------------------------
   
-  #menu item that displays the number of documents in the corpus
+  #######################
+  # SIDE BAR UI ELEMENTS
+  #######################
+  # menu item that displays the number of documents in the corpus
   output$searchMenu<-renderMenu({
     badgeLabel<-ifelse(is.null(values$corpus),"0",toString(nrow(values$corpus)))
     menuItem("Search Results", tabName = "searchOverview", icon = icon("book"),badgeLabel = badgeLabel)
   })
+  
+  #######################
+  # SEARCH INPUT UI ELEMENTS
+  #######################
+  
+  # If user choose to save their analysis (default option)
+  # Allow user to enter their own file name. Default file name
+  # Is based upon date & time
+  # Note to self : I add the loadData condition so that
+  # a user can't enter a new file name, switch to the load data tab
+  # a save a bunch of new files
+  output$analysisFileName<-renderUI({
+    if(input$saveAnalysis & input$loadData !="Load Data"){
+      textInput("analysisName",
+                label = "File name prefix for analysis (saved in priorRuns folder):",
+                value = values$fileName)
+    }else{
+      NULL
+    }
+  })
+  
+  
+  ###################################
+  # SEARCH RESULTS OVERVIEW ELEMENTS
+  ###################################
   
   #output some summary text of how many articles there are in a document
   output$summaryText<-renderUI({
@@ -318,6 +375,10 @@ shinyServer(function(input, output,session) {
   })
   
   
+  ###################################
+  # TOPIC DISCOVERY ELEMENTS
+  ###################################
+  
   # a button that initiates the analysis of the document corpus!
   output$topicClustInitiateButton<-renderUI({
     if(!is.null(values$corpus) & is.null(values$tsneObj)){
@@ -330,8 +391,7 @@ shinyServer(function(input, output,session) {
   })
   
   
-  
-  #Some instruction text that tells user to run a search before they can do topic anlaysis
+  #Text  that summmarised the cluster results, or document statement if cluster analysis not run yet
   output$clusterOverviewStatement<-renderUI({
     if(!is.null(values$tsneObj)){
       totalDoc<-nrow(values$corpus)
@@ -350,20 +410,27 @@ shinyServer(function(input, output,session) {
     
   })
   
-  #Allow user to enter alternative file name for analysis files
-  output$analysisFileName<-renderUI({
-    if(input$saveAnalysis){
-      searchInput(
-        inputId = "analysisName", 
-        label = "File Names for Save Analysis:", 
-        placeholder = sprintf("Enter alternative file"),
-        value = values$fileName,
-        btnSearch = icon("check"), 
-        btnReset = icon("remove"), 
-        width = "300px"
+  # Define UI for the little cog wheel by the t-SNE plot
+  # It will depend on the optimal parameters
+  output$plotOptions<-renderUI({
+    
+    if(!is.null(values$corpus$tsneClusterNames)){
+      dropdownButton(
+        tags$h3("Change plot parameters"),
+        p("Change Graph Appearance"),
+        p("tsne parameters"),
+        selectInput(inputId = 'xcol', label = 'X Variable', choices = names(iris)),
+        br(),
+        br(),
+        p("hbscan parameters"),
+        selectInput(inputId = 'ycol', label = 'Y Variable', choices = names(iris), selected = names(iris)[[2]]),
+        sliderInput(inputId = 'clusters', label = 'Cluster count', value = 3, min = 1, max = 9),
+        circle = TRUE, status = "danger", icon = icon("gear"), width = "300px",
+        tooltip = tooltipOptions(title = "Click to see inputs !")
       )
+      
     }else{
-      return(NULL)
+      NULL
     }
   })
   
@@ -409,41 +476,7 @@ shinyServer(function(input, output,session) {
   })
 
   
-  
-  # Define UI for the little cog wheel by the t-SNE plot
-  # It will depend on the optimal parameters
-  output$plotOptions<-renderUI({
-    
-    if(!is.null(values$corpus$tsneClusterNames)){
-      dropdownButton(
-        tags$h3("Change plot parameters"),
-        p("Change Graph Appearance"),
-        p("tsne parameters"),
-        selectInput(inputId = 'xcol', label = 'X Variable', choices = names(iris)),
-        br(),
-        br(),
-        p("hbscan parameters"),
-        selectInput(inputId = 'ycol', label = 'Y Variable', choices = names(iris), selected = names(iris)[[2]]),
-        sliderInput(inputId = 'clusters', label = 'Cluster count', value = 3, min = 1, max = 9),
-        circle = TRUE, status = "danger", icon = icon("gear"), width = "300px",
-        tooltip = tooltipOptions(title = "Click to see inputs !")
-      )
-      
-    }else{
-      NULL
-    }
-  })
-  
-  
-  ### GENERATION ALL OF THE CLUSTER DETAILS AND STORING THEM AS NEED
-
-  # In the topic cluster tab, and when the user brushes
-  # over points in the tsnePlot, populate a 
-  # box with some information about the cluster.
-  # That informaiton is: the name of the cluster,
-  # the top-ten most frequently occuring words
-  # and the 5 most cited papers (according to pubmed PMC)
-  #gotta generate it this way for deselect all to work
+  ### GENERATION ALL OF THE CLUSTER DETAILS AND STORING THEM AS NEED  ### 
   observe({
     #The dropbdown box
     if(!is.null(values$tsneObj)){
@@ -457,14 +490,13 @@ shinyServer(function(input, output,session) {
     }
 
   })
-  # 
+  
   #This actually works, and I am aghast!
   output$clusterSelect<-renderUI({
     values$clustInfoDetailsUI
   })
   
   #show detailed cluster information on selections
-  
   observe({
     clustInfo<-NULL
     if(!is.null(values$tsneObj)){
@@ -489,6 +521,23 @@ shinyServer(function(input, output,session) {
     values$clustInfoClustOverview
   })
   
+  
+  #This is a silly way to make the deselect / select buttons work
+  #for showing cluster labels
+  #show base plot if user selects to deselect all cluster names
+  observeEvent(input$deselectAllClust,{
+    values$pTsneFinal<-values$tsnePlot
+    updatecheckboxGroupButtons_Custom(session,"clustButtonSelect",NULL)
+    
+    #This is a bit hacky, but it does work
+    values$clustInfoDetailsUI<-HTML("To get cluster details, select some cluster(s) by <em>clicking on the topic buttons</em>.")
+    values$clustInfoClustOverview<-NULL
+    values$clustInfoDetailsPlot<-NULL
+    
+    
+  })
+  
+  # Summary text
   output$clusterDetailsNote<-renderUI({
     preamble<-NULL
     if(!is.null(values$tsneObj) & !is.null(input$clustDetails)){
@@ -498,12 +547,163 @@ shinyServer(function(input, output,session) {
   })
   
   
+  ###################################
+  # SAMPLE DOCUMENTS ELEMENTS
+  ###################################
+  
+  # Choice widget: Sampling weighting choices
+  output$weightedSampleOptions<-renderUI({
+    if(input$sampChoices=="randomWeighted"){
+      radioButtons("sampleWeight",
+                   label = "Selected option for  sample weight",
+                   choiceNames = c("PMC Citation - article with higher citations are more likely to be sampled",
+                                   "Recency - articles that have been recently published are more likely to be sampled") ,
+                   choiceValues = c("citation","recency"))
+    }else{
+      NULL
+    }
+  })
+  
+  #Filter widget: filter by journal
+  output$filtJournal<-renderUI({
+    if(!is.null(values$corpus)){
+      #articles coming from differen journals
+      journ<-values$corpus %>%
+        ungroup()%>% #just in case
+        group_by(Journal) %>%
+        count() %>%
+        arrange(-n) %>%
+        mutate(journalName = sprintf("%s (n=%d)",Journal,n ))
+        
+      pickerInput(
+        inputId = "filtJournalChoices", 
+        label = "Select journals to include (default: select all)", 
+        width="100%",
+        choices =  journ$journalName,
+        selected = journ$journalName,
+        options = list(
+          `actions-box` = TRUE, 
+          size = 10,
+          `selected-text-format` = "count > 3"
+        ), 
+        multiple = TRUE
+      )
+    }else{
+      NULL
+    }
+  })
+  
+  
+  #Filted widget: filter articles by year
+  output$filtYear<-renderUI({
+    if(!is.null(values$corpus)){
+      yearMin<-min(values$corpus$YearPub)
+      yearMax<-max(values$corpus$YearPub)
+      
+      sliderInput("filtYearChoices",
+                  label="Select years to include (default: select all)",
+                  min=yearMin,
+                  max=yearMax,
+                  value = c(yearMin,yearMax),
+                  sep="")
+    }else{
+      NULL
+    }
+  })
+  
+  #Filter widget: filter by article type
+  output$filtArticleType<-renderUI({
+    if(!is.null(values$corpus)){
+      #articles coming from differen journals
+      journ<-values$corpus %>%
+        ungroup()%>% #just in case
+        group_by(journalType) %>%
+        count() %>%
+        arrange(-n) %>%
+        mutate(articleTypeName = sprintf("%s (n=%d)",journalType,n ))
+      
+      pickerInput(
+        inputId = "filtArticleChoices", 
+        label = "Select article types (defined by PubMed) to include (default: select all)", 
+        width="100%",
+        choices =  journ$articleTypeName,
+        selected = journ$articleTypeName,
+        options = list(
+          `actions-box` = TRUE, 
+          size = 10,
+          `selected-text-format` = "count > 3"
+        ), 
+        multiple = TRUE
+      )
+    }else{
+      NULL
+    }
+  })
+  
+  #Filter widget: filter by whether article is open source
+  output$filtIsOpen<-renderUI({
+    if(!is.null(values$corpus)){
+      checkboxInput("filtIsOpenChoices",
+                    label="Sample *only* articles with full text available (default: no)",
+                    value=FALSE,
+                    width="100%")
+    }else{
+      NULL
+    }
+  })
+  
+  #Filter widget: filter by minimum number of citations
+  output$filtMinCitation<-renderUI({
+    
+    if(!is.null(values$corpus)){
+      maxCite<-max(as.numeric(as.character(values$corpus$pmcCitationCount)))
+      numericInput("filtMinCitationChoice",
+                   label="Select the minimum number of citations an article must have (warning! biases against more recent articles)",
+                   min=0,
+                   max=maxCite,
+                   value=0)
+    }else{
+      NULL
+    }
+  })
+  
+  #Filter widget: filter by minimum number of citations
+  output$filtTopic<-renderUI({
+    if(!is.null(values$tsneObj)){
+      clusterN<-values$corpus %>%
+        ungroup()%>% #just in case
+        group_by(tsneClusterNames) %>%
+        count() %>%
+        arrange(-n) %>%
+        mutate(tsneClusterNamesFormatted = sprintf("%s (n=%d)",tsneClusterNames,n ))
+      
+      choicesNoNoise<-filter(clusterN,tsneClusterNames !="Noise")
+      
+      pickerInput(
+        inputId = "filtTopicsChoices", 
+        label = "Select topics (clusters) to include (default: select all except unclustered)", 
+        width="100%",
+        choices =  clusterN$tsneClusterNames,
+        selected = choicesNoNoise$tsneClusterNames,
+        options = list(
+          `actions-box` = TRUE, 
+          size = 10,
+          `selected-text-format` = "count > 3"
+        ), 
+        multiple = TRUE
+      )
+    }else{
+      NULL
+    }
+  })
+  
   #------------------------------------------------------------------------------------
   # VISUALIZATIONS
   #------------------------------------------------------------------------------------
  
-  ################################
-  # Document summary plots
+  ###################################
+  # SEARCH RESULTS OVERVIEW VIZ
+  ###################################
   
   #years spanning the publication records
   output$yearPubPlot<-renderPlot({
@@ -654,8 +854,9 @@ shinyServer(function(input, output,session) {
     
   })
   
-  ################################
-  # Clustering and t-SNE scatter plot
+  ###################################
+  # CLUSTERING and t-SNE
+  ###################################
   
   # Plot the tSNE result, make this seperate from the cluster labels
   # so I don't recompute the plot every time I update the labels!
@@ -692,22 +893,6 @@ shinyServer(function(input, output,session) {
     }else{
       NULL
     }
-  })
-  
-  #This is a silly way to make the deselect / select buttons work
-  #for showing cluster labels
-  #show base plot if user selects to deselect all cluster names
-  observeEvent(input$deselectAllClust,{
-   values$pTsneFinal<-values$tsnePlot
-   updatecheckboxGroupButtons_Custom(session,"clustButtonSelect",NULL)
-   
-   #This is a bit hacky, but it does work
-   values$clustInfoDetailsUI<-HTML("To get cluster details, select some cluster(s) by <em>clicking on the topic buttons</em>.")
-   #values$clustInfo$detailsUI<-HTML("To get cluster details, select some cluster(s) by <em>clicking on the topic buttons</em>.")
-   values$clustInfoClustOverview<-NULL
-   values$clustInfoDetailsPlot<-NULL
-
-   
   })
   
   #if user selects all show all labels
@@ -789,7 +974,7 @@ shinyServer(function(input, output,session) {
   
   
   #------------------------------------------------------------------------------------
-  # INFO SUMMARY BOX UI
+  # INFO SUMMARY BOX UI - STATEMENTS AT THE TOP OF EACH PAGE
   #------------------------------------------------------------------------------------
   
   
@@ -825,6 +1010,18 @@ shinyServer(function(input, output,session) {
 </p>
            </div>")
   })
+  
+  
+  #For search results tab
+  output$sampleInfoStatement<-renderUI({
+    HTML("<b><big>Sample Documents</big></b> <a href='#sampleDocsInfo'data-toggle='collapse'><small><em>(show document sampling details)</small></em></a>
+         <div id='sampleDocsInfo' class= 'collapse'>
+         Document sampling allows you to define a subset of the document corpus for additional analysis that Adjutant does not support. For example, maybe you only want articles from 2015 and beyond, but your document corpus contains articles ranging from 1998 - 2017, in this scenario you can use this documnet sampling area to get those 2015 and beyond articles. You might wonder, 'why not just modify my PubMed search so that I only have articles from 2015 and beyond?'. The answer is that text mining works best when there's more data- so if you have many years of data you'll get better defined topic clusters, and then you can define the subset of articles that you are most interested in. You can download the sampled documents to your computer in a CSV or Excel format. <strong>Be sure to also look at the 'prior runs' folder for automatically saved datasets.</strong><br>
+         </div>")
+  })
+  
+  
+  
   
   #cluster info box
   output$clustTopicBoxInfo<-renderUI({

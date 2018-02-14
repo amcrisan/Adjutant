@@ -1,19 +1,18 @@
 
 #Run the initial query string
 
-processSearch<-function(query=NULL,demoversion=TRUE){
+processSearch<-function(query=NULL,demoversion=FALSE){
   
   #Running Query on Pubmed - kinda just gets me PMIDS
-  withProgress(message = 'Running Pubmed Query', value = 0, {
-    resQ1 <- EUtilsSummary(query, type='esearch', db='pubmed')
+  resQ1 <- EUtilsSummary(query, type='esearch', db='pubmed')
     
-    # return all queries, or if it's the demo version, only return the first 1000
-    if(!demoversion){
-      resQ1 <- EUtilsSummary(query, type='esearch', db='pubmed',retmax=resQ1@count)
-    }
+  # return all queries, or if it's the demo version, only return the first 1000
+  if(!demoversion){
+    resQ1 <- EUtilsSummary(query, type='esearch', db='pubmed',retmax=resQ1@count)
+  }
     
-    pmidUnique<-unique(resQ1@PMID)
-  })
+  pmidUnique<-unique(resQ1@PMID)
+
   
   #Gather data in batches and convert to data frame
   #format the data
@@ -31,9 +30,6 @@ processSearch<-function(query=NULL,demoversion=TRUE){
   
   corpus<- dplyr::distinct(corpus)
   
-  #finally check for any items in the corpus that DO NOT have either a title or abstract
-  corpus<- corpus %>%
-    filter()
   return(corpus)
 }
 
@@ -41,21 +37,6 @@ processSearch<-function(query=NULL,demoversion=TRUE){
 #formatting the pubmed data. Helper script to processSearch function
 #retrieve and format data
 formatData<-function(ids = NULL){
-  #limitation : extract resuts as sets of 200. There's a limit to how many
-  #iI passed 2000 objects in, but 1/10th of that seems to be the magic # before timeoouts
-  
-  # if(length(ids) <100){
-  #   #process all at once
-  #   numVals<-c(1,length(ids))
-  # }else{
-  #   #break it up into chunks b.c it makes it easier to query
-  #   numVals<-seq(from=0,to=length(ids),by=100)
-  #   
-  #   if(tail(numVals, n=1)< length(ids)){
-  #     numVals<-c(numVals,tail(numVals, n=1) + (length(ids) %% 100))
-  #   }
-  # }
-  
   #data frame to be filled with glorious data
   allData<-data.frame(PMID=NULL,
                       YearPub=NULL,
@@ -78,10 +59,6 @@ formatData<-function(ids = NULL){
   # files that are nice and easy to parse. But efetch does not produce something nice and it seems
   # the best way to query through R right now is to use risemed for eftech. Apparently efetch is the only
   # part of the eUtils suite that DOESN'T yet properly return JSON. eSearch does and eSummary does.
-  #for(i in 1:(length(numVals)-1)){
-    #to make this faster, form new query on ID run in parallel
-    #start = numVals[i]
-    #end = numVals[i + 1]
     
     tmpids<-ids
     pubResults<-EUtilsGet(paste0(tmpids,collapse = ","),type="efetch",db="pubmed")
@@ -112,13 +89,13 @@ formatData<-function(ids = NULL){
       
       return(x$meshTerms)
     })
+    
     #get some article metadata that doesn't ship with risemed EUTilsGet
     # an important note: article citations from PUBmed are basically summarizing
     # what *other pubmed articles* have referenced this work. This number *does not*
     # match what a google search provides. The number provided here relies on 
     # Pubmed Central (open access). SO it's a decent heuristic, but its not perfect
-    
-    metadata<-c()
+     metadata<-c()
     url<-sprintf("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=pubmed&id=%s&retmode=json",paste0(tmpids,collapse="+"))
     tmp<-fromJSON(url)
     

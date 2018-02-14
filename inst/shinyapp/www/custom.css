@@ -51,3 +51,6 @@
     border: 2px solid #686868;
 	  color: #686868;
 }
+
+/* Vertical scroll bar */
+.sidebar { height: 90vh; overflow-y: auto; }
