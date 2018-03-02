@@ -137,7 +137,7 @@ body<-dashboardBody(
                shinydashboard::box(title="Topic Cluster Details",
                                    id="exploreClust",
                                    width="100%",
-                                   uiOutput("clusterDetailsNote"),
+                                   #uiOutput("clusterDetailsNote"),
                                    uiOutput("clusterSelect"),
                                    uiOutput("clusterDetails"),
                                    plotOutput("clusterDetailsGrowth",height="250px"))

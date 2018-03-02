@@ -1,22 +1,24 @@
 
 #Run the initial query string
 
-processSearch<-function(query=NULL,demoversion=FALSE){
-  
+processSearch<-function(query=NULL,demoversion=FALSE, ...){
+  addedParam<- list(...)
   #Running Query on Pubmed - kinda just gets me PMIDS
-  resQ1 <- EUtilsSummary(query, type='esearch', db='pubmed')
-    
+  resQ1 <- EUtilsSummary(query=query, type='esearch', db='pubmed', ...)
+  
   # return all queries, or if it's the demo version, only return the first 1000
   if(!demoversion){
-    resQ1 <- EUtilsSummary(query, type='esearch', db='pubmed',retmax=resQ1@count)
+    #if no retmax is specified, than, run this query to get more than 1000 PMIDS
+    if(is.null(addedParam[['retmax']])){
+      resQ1 <- EUtilsSummary(query, type='esearch', db='pubmed',retmax=resQ1@count, ...)
+    }
   }
-    
+  
   pmidUnique<-unique(resQ1@PMID)
-
   
   #Gather data in batches and convert to data frame
   #format the data
-  #need to put everything together in batches, 200 articles was the magic number before time outs occur
+  #need to put everything together in batches, 100 articles was the magic number before time outs occur
   #in both risemed and also limits of what esummary will return
   numVals<-seq(from=0,to=length(pmidUnique),by=100)
   numVals<-c(numVals,tail(numVals, n=1) + (length(pmidUnique) %% 100))
@@ -37,22 +39,6 @@ processSearch<-function(query=NULL,demoversion=FALSE){
 #formatting the pubmed data. Helper script to processSearch function
 #retrieve and format data
 formatData<-function(ids = NULL){
-  #data frame to be filled with glorious data
-  allData<-data.frame(PMID=NULL,
-                      YearPub=NULL,
-                      Journal=NULL,
-                      Authors=NULL,
-                      Title=NULL,
-                      Abstract=NULL,
-                      articleType = NULL,
-                      language = NULL,
-                      pmcCitationCount = NULL,
-                      pmcID = NULL,
-                      doi = NULL,
-                      meshTerms=NULL,
-                      stringsAsFactors = FALSE)
-  
-  
   #This here makes the queries into small manageable chucks so it doesn't time out.
   
   # TO DO: Switch from RISEmed to just parsing JSON files. Right now, esummary produces valid JSON
@@ -60,7 +46,7 @@ formatData<-function(ids = NULL){
   # the best way to query through R right now is to use risemed for eftech. Apparently efetch is the only
   # part of the eUtils suite that DOESN'T yet properly return JSON. eSearch does and eSummary does.
     
-    tmpids<-ids
+    tmpids<-ids #sanity check for when results suddenly seem to get dropped
     pubResults<-EUtilsGet(paste0(tmpids,collapse = ","),type="efetch",db="pubmed")
     
     #make sure that results out = result in. EUtils 
@@ -69,6 +55,8 @@ formatData<-function(ids = NULL){
     notThere<-which(!(tmpids %in% pubResults@PMID))
     if(length(notThere)>0){
       missingPMID<-tmpids[notThere]
+      print("These are missing")
+      print(missingPMID)
       tmpids<-setdiff(tmpids,missingPMID)
     }
     
@@ -95,51 +83,44 @@ formatData<-function(ids = NULL){
     # what *other pubmed articles* have referenced this work. This number *does not*
     # match what a google search provides. The number provided here relies on 
     # Pubmed Central (open access). SO it's a decent heuristic, but its not perfect
-     metadata<-c()
     url<-sprintf("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=pubmed&id=%s&retmode=json",paste0(tmpids,collapse="+"))
     tmp<-fromJSON(url)
     
-    #TO DO: move to lapply once I've got a better sanity check to make sure result order matches up
-    for(pmid in tmpids){
-      metadata<-rbind(metadata,processMetaJSON(pmid,tmp$result[[as.character(pmid)]]))
-    }
-    
+    metadata<-sapply(tmp$result[2:length(tmp$result)],function(x){
+      processMetaJSON(x)
+    }) %>% t() %>%
+      data.frame(stringsAsFactors=FALSE) %>%
+      mutate(X1=as.factor(X1))
+
+    colnames(metadata)<-c("PMID","articleType","language","pmcCitationCount","pmcID","doi")
+
     #putting all the data together into a data frame
-    temp<-data.frame(PMID=pubResults@PMID,
+    risResults<-data.frame(PMID=pubResults@PMID,
                      YearPub=pubResults@YearPubmed,
                      Journal=pubResults@Title,
                      Authors=authors,
                      Title=pubResults@ArticleTitle,
-                     Abstract=pubResults@AbstractText,
-                     articleType = metadata[,1],
-                     language = metadata[,2],
-                     pmcCitationCount =metadata[,3],
-                     pmcID = metadata[,4],
-                     doi = metadata[,5],
-                     stringsAsFactors = FALSE)
+                     Abstract=pubResults@AbstractText)
+  
     
-    
+    allData<-dplyr::inner_join(risResults,metadata,by="PMID")
+  
     #adding those meshTerms
-    temp$meshTerms<-meshTerms
+    allData$meshTerms<-meshTerms
     
     #finally, clean up the pmcCitationCOunt
-    temp<-temp %>%
-      mutate(pmcCitationCount = ifelse(is.na(pmcCitationCount),0,as.numeric(pmcCitationCount)))
+    allData<-allData %>%
+      mutate(pmcCitationCount = ifelse(is.na(pmcCitationCount),0,pmcCitationCount))
     
-    
-    #allData<-rbind(allData,temp)
-    
-    allData<-temp
-  
   return(allData)
 }
 
 
 #processing the JSON files from the pubmed document additional metadata
-processMetaJSON<-function(pmid = NULL,tmp=NULL){
+processMetaJSON<-function(tmp=NULL){
   if("error" %in% names(tmp)){
     #There is no document summary information available, just result NA
-    return(c(NA,NA,NA,NA,NA))
+    return(c(NA,NA,NA,NA,NA,NA))
   }else{
     #get DOI & PMC
     altID<-tmp$articleids %>% 
@@ -159,11 +140,11 @@ processMetaJSON<-function(pmid = NULL,tmp=NULL){
     
     # clearly add the pubtype (i.e. journal article)
     pubtype<-tmp$pubtype
-    if(is.null(pubtype)){
+    if(is.null(pubtype) | class(pubtype)=="list"){
       pubtype<-NA
-    }else if(class(pubtype)=="list"){
-      pubtype <- "Journal Article" #i chose this default
-    }
+    }#else if(class(pubtype)=="list" | length(pubtype)>1){
+    #  pubtype <- "Journal Article" #i chose this default
+    #}
     
     #also add subtype if it's there (how i've interpretted this)
     #seems like sometimes the second option is a specific subtype (like a review)
@@ -171,13 +152,18 @@ processMetaJSON<-function(pmid = NULL,tmp=NULL){
     
     # finally, the language 
     lang<-tmp$lan
-    if(is.null(lang) | class(lang) == "list"){lang<-NA}
+    if(is.null(lang)){
+      lang<-NA
+    }else if (length(lang) > 1){
+      lang<-paste0(lang,collapse=";")
+    }
+    
     
     #if statement is a sanity check to make sure the records are the same
-    if(altID$pubmed == pmid){
-      return(c(pubtype,lang,pmcrefCount,altID$pmc,altID$doi))
+    if(!is.na(altID$pubmed)){
+      return(c(altID$pubmed,pubtype,lang,pmcrefCount,altID$pmc,altID$doi))
     }else{
-      return(c(NA,NA,NA,NA,NA))
+      return(c(NA,NA,NA,NA,NA,NA))
     } 
   }
 }

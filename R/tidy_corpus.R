@@ -5,7 +5,7 @@ tidyCorpus<- function(corpus=NULL){
   
   data(stop_words)
   #remove some common terms that will occur in abstract
-  customStopTerms<-data.frame(word=c("abstract", "text", "abstracttext","introduction","background","method","methods","methodology","conclusion","conclusions","objectives","results","result","we","materials","purpose","significance","significant","mg"))
+  customStopTerms<-data.frame(word=c("abstract", "text", "abstracttext","introduction","background","method","methods","methodology","conclusion","conclusions","objectives","results","result","we","materials","purpose","significance","significant","mg","http","com"))
   
   # Make text tidy!
   #withProgress(message = 'Formatting data for text analysis', value = 0.1, {

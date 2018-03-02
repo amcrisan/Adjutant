@@ -1,6 +1,7 @@
 library(shiny)
 library(RISmed)
 library(rms)
+library(purrr)
 library(dplyr)
 library(DT)
 library(dplyr)
@@ -112,7 +113,8 @@ shinyServer(function(input, output,session) {
   observeEvent(input$searchQuery_search,{
     if(!is.null(input$searchQuery_search)){
       
-       withProgress(message = 'Querying Pubmed', value = 0, {
+       withProgress(message = 'Querying Pubmed', value = 0,
+                    detail="This can take a few minutes depending upon how many articles there are",{
          incProgress(amount = runif(1,min=0.1,max=0.4)) #doesn't do much but visually pacifying because it looks like things are happening
         df<-processSearch(input$searchQuery) #search pubmed
        })
@@ -240,7 +242,12 @@ shinyServer(function(input, output,session) {
                      
         incProgress(amount = runif(1,min=0.1,max=0.4)) #doesn't do much but visually pacifying because it looks like things are happening
                      
-        tsneObj<-runTSNE(tidyCorpus_df,check_duplicates=FALSE)
+        if(nrow(values$corpus)>300){
+          values$tsnePer<-70
+        }
+        
+        #run t-SNE         
+        tsneObj<-runTSNE(tidyCorpus_df,check_duplicates=FALSE,perplexity=values$tsnePer)
         values$tsneObj<-tsneObj
       })
   
@@ -482,6 +489,11 @@ shinyServer(function(input, output,session) {
     values$corpusSubset<-datSub
     remove(datSub)
     gc()
+    
+    if(input$saveAnalysis){
+      savedFileName<-paste("./storedRuns/", values$fileName,"_subset.RDS", sep = "")
+      saveRDS(values$corpusSubset,file=savedFileName)
+    }
       
   })
   
