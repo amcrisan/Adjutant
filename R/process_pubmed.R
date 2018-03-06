@@ -1,8 +1,8 @@
 
 #Run the initial query string
-
 processSearch<-function(query=NULL,demoversion=FALSE, ...){
   addedParam<- list(...)
+  print(addedParam)
   #Running Query on Pubmed - kinda just gets me PMIDS
   resQ1 <- EUtilsSummary(query=query, type='esearch', db='pubmed', ...)
   
@@ -49,6 +49,9 @@ formatData<-function(ids = NULL){
     tmpids<-ids #sanity check for when results suddenly seem to get dropped
     pubResults<-EUtilsGet(paste0(tmpids,collapse = ","),type="efetch",db="pubmed")
     
+    
+    EUtilsGet("29492318",type="efetch",db="pubmed")
+    
     #make sure that results out = result in. EUtils 
     #its an odd fringe case, but this does actually happen
     #and it needs to be delt with more gracefully
@@ -92,7 +95,7 @@ formatData<-function(ids = NULL){
       data.frame(stringsAsFactors=FALSE) %>%
       mutate(X1=as.factor(X1))
 
-    colnames(metadata)<-c("PMID","articleType","language","pmcCitationCount","pmcID","doi")
+    colnames(metadata)<-c("PMID","articleType","language","pmcCitationCount","pmcID","doi","Title")
 
     #putting all the data together into a data frame
     risResults<-data.frame(PMID=pubResults@PMID,
@@ -100,11 +103,39 @@ formatData<-function(ids = NULL){
                      Journal=pubResults@Title,
                      Authors=authors,
                      Title=pubResults@ArticleTitle,
-                     Abstract=pubResults@AbstractText)
+                     Abstract=pubResults@AbstractText,
+                     stringsAsFactors = FALSE)
   
     
-    allData<-dplyr::inner_join(risResults,metadata,by="PMID")
-  
+    allData<-dplyr::inner_join(risResults,dplyr::select(metadata,-contains("Title")),by="PMID")
+    
+    
+    ### FIND AND CLEAN UP MISSING DATA
+    #find missing titles and replace them with metadata version
+    #really need to eventually replace rismed in pipeline
+    
+    missingInfo<-filter(allData,is.na(Title))
+    
+    if(nrow(missingInfo)>0){
+      idxMatch<-match(missingInfo$PMID,metadata$PMID)
+      idxdf<-match(missingInfo$PMID,allData$PMID)
+      
+      allData[idxdf,]$Title<-metadata[idxMatch,]$Title
+    }
+    
+    #find missing abstracts and add them properly do the data
+    missingInfo<-filter(allData,Abstract == "")
+    
+    if(nrow(missingInfo)>0){
+      idxdf<-match(missingInfo$PMID,allData$PMID)
+      missingAbs<-sapply(missingInfo$PMID,function(x){
+        getMissingAbstract(x)
+      })
+      
+      allData[idxdf,]$Abstract<-missingAbs
+    }
+    
+    
     #adding those meshTerms
     allData$meshTerms<-meshTerms
     
@@ -120,7 +151,7 @@ formatData<-function(ids = NULL){
 processMetaJSON<-function(tmp=NULL){
   if("error" %in% names(tmp)){
     #There is no document summary information available, just result NA
-    return(c(NA,NA,NA,NA,NA,NA))
+    return(c(NA,NA,NA,NA,NA,NA,NA))
   }else{
     #get DOI & PMC
     altID<-tmp$articleids %>% 
@@ -134,6 +165,13 @@ processMetaJSON<-function(tmp=NULL){
     if(is.null(altID$pmc)){altID$pmc<-NA}
     if(is.null(altID$pubmed)){altID$pubmed<-NA}
     
+    #storing title as backup, beacuse sometimes rise med doesn't properly parse the XML
+    # due to HTML elements existing in the title (sigh...)
+    
+    
+    articleTitle<-tmp$title
+    articleTitle<-gsub("&lt;[//]?i&gt;","",articleTitle) #getting rid of italics <i> the most common HTML tag in title
+    
     #pmc ref count
     pmcrefCount<-tmp$pmcrefcount
     if(pmcrefCount=="" | is.null(pmcrefCount)){pmcrefCount<-NA}
@@ -142,9 +180,7 @@ processMetaJSON<-function(tmp=NULL){
     pubtype<-tmp$pubtype
     if(is.null(pubtype) | class(pubtype)=="list"){
       pubtype<-NA
-    }#else if(class(pubtype)=="list" | length(pubtype)>1){
-    #  pubtype <- "Journal Article" #i chose this default
-    #}
+    }
     
     #also add subtype if it's there (how i've interpretted this)
     #seems like sometimes the second option is a specific subtype (like a review)
@@ -161,9 +197,16 @@ processMetaJSON<-function(tmp=NULL){
     
     #if statement is a sanity check to make sure the records are the same
     if(!is.na(altID$pubmed)){
-      return(c(altID$pubmed,pubtype,lang,pmcrefCount,altID$pmc,altID$doi))
+      return(c(altID$pubmed,pubtype,lang,pmcrefCount,altID$pmc,altID$doi,articleTitle))
     }else{
-      return(c(NA,NA,NA,NA,NA,NA))
+      return(c(NA,NA,NA,NA,NA,NA,NA))
     } 
   }
+}
+
+
+getMissingAbstract<-function(PMID=NULL){
+  test<-paste(readLines(sprintf("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&id=%s",PMID)),collapse="\n")
+  test<-str_extract(test,'abstract\\s+("([^"]|"")*")') %>% gsub("abstract","",.) %>% gsub('\\"',"",.) %>% gsub("\n","",.)
+  return(test)
 }

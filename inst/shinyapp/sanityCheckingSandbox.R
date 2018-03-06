@@ -264,53 +264,10 @@ p<-df %>%
 
 p
 
-##########
-# OLDER STUFF
 
-#Alternative way to assess the goodness of fit
+### GET ARTICLE TITLE AND TEXT WHEN IT IS MISSING FROM PUB MED
 
-#create a matrix for analysis
-analysisMat<-tmp %>%
-  select(tsneComp1,tsneComp2,cluster,clustMembership) %>%
-  tidyr::spread(cluster,clustMembership,fill=0)
-
-#run a multivariate regression
-colInfo<-colnames(analysisMat)
-
-Y <-cbind(analysisMat$tsneComp1,analysisMat$tsneComp2)
-f <- as.formula(paste('Y ~', paste(colInfo[4:length(colInfo)], collapse='+')))
-
-regAttempt<-lm(f,analysisMat)
-regAttemptSum<-summary(regAttempt)
-
-
-
-
-library(MASS)
-Box = boxcox(si[,3] ~ 1,              # Transform Turbidity as a single vector
-             lambda = seq(-10,10,0.1)      # Try values -6 to 6 by 0.1
-)
-
-Cox = data.frame(Box$x, Box$y)            # Create a data frame with the results
-
-Cox2 = Cox[with(Cox, order(-Cox$Box.y)),] # Order the new data frame by decreasing y
-
-Cox2[1,] 
-
-lambda = Cox2[1, "Box.x"]                 # Extract that lambda
-
-T_box = (si[,3] ^ lambda - 1)/lambda   # Transform the original data
-
-hist(T_box)
-
-# Box cox transformation to try make the repsonse a little more normal
-# Code taken from: http://rcompanion.org/handbook/I_12.html
-Box = boxcox(sil[,3] ~ 1,lambda = seq(-10,10,0.1))     
-Cox = data.frame(Box$x, Box$y)            # Create a data frame with the results
-Cox2 = Cox[with(Cox, order(-Cox$Box.y)),] # Order the new data frame by decreasing y
-lambda = Cox2[1, "Box.x"]                 # Extract that lambda
-T_box = (sil[,3] ^ lambda - 1)/lambda   # Transform the original data
-
-tmpSub$sil_width_box <- T_box #sil width for inividuals points
+test<-paste(readLines("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&id=29492318"),collapse="\n")
+str_extract(test,'abstract\\s+("([^"]|"")*")') %>% gsub("abstract","",.) %>% gsub('\\"',"",.)
 
 

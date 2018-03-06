@@ -27,7 +27,8 @@ source("../../R/explore_clusters.R")
 set.seed(416) #repping the 6ix! 
 
 #Query Strings used for testing testing - I use a couple of example here
-queryString<-'"mycobacterium tuberculosis "[All Fields] AND "genome"[All Fields] AND (("2016/01/01"[PDAT] : "2017/10/01"[PDAT]) AND English[lang]) AND (("2016/01/01"[PDAT] : "2017/10/01"[PDAT]) AND English[lang])'
+queryString<-"(outbreak OR epidemic OR pandemic) AND genom*"
+#queryString<-'"mycobacterium tuberculosis "[All Fields] AND "genome"[All Fields] AND (("2016/01/01"[PDAT] : "2017/10/01"[PDAT]) AND English[lang]) AND (("2016/01/01"[PDAT] : "2017/10/01"[PDAT]) AND English[lang])'
 #queryString<-'"mycobacterium tuberculosis "[All Fields] AND (("2016/10/01"[PDAT] : "2017/10/01"[PDAT]) AND English[lang]) AND (("2016/01/01"[PDAT] : "2017/10/01"[PDAT]) AND English[lang])'
 #queryString<-'(("prostatic neoplasms"[MeSH Terms] OR ("prostatic"[All Fields] AND "neoplasms"[All Fields]) OR "prostatic neoplasms"[All Fields] OR ("prostate"[All Fields] AND "cancer"[All Fields]) OR "prostate cancer"[All Fields]) AND ("genomics"[MeSH Terms] OR "genomics"[All Fields])) AND ("2014/10/01"[PDAT] : "2014/12/01"[PDAT])'
 #queryString<-'"IEEE transactions on visualization and computer graphics"[Journal]'
@@ -107,6 +108,7 @@ shinyServer(function(input, output,session) {
   # Example text loaded into search textbox
   observeEvent(input$loadExample,{
     updateSearchInput(session,"searchQuery",value = queryString)
+    updateTextInput(session,"retmax",value = 1000)
   })
   
   # Observe if 'search' button is pushed to initate pubmed query
@@ -114,9 +116,19 @@ shinyServer(function(input, output,session) {
     if(!is.null(input$searchQuery_search)){
       
        withProgress(message = 'Querying Pubmed', value = 0,
-                    detail="This can take a few minutes depending upon how many articles there are",{
+                    detail="This can take a few minutes depending upon how many articles there are. This step also looks up multiple sources of information too. For about one thousand articles it can take 2 - 3 minutes to grab all the data and format it for R.",{
          incProgress(amount = runif(1,min=0.1,max=0.4)) #doesn't do much but visually pacifying because it looks like things are happening
-        df<-processSearch(input$searchQuery) #search pubmed
+                      
+        #creating a vector list of arguements
+        searchArgs<-list(query = ifelse(is.null(input$searchQuery),NA,input$searchQuery),
+                    demoversion = FALSE,
+                    retmax = ifelse(input$retmax == "",NA,as.numeric(input$retmax)), #as numeric failure defaults to NA
+                    mindate = ifelse(!input$dateRange,NA,as.character(format(input$dateRangeVal[1],"%Y/%m/%d"))),
+                    maxdate = ifelse(!input$dateRange,NA,as.character(format(input$dateRangeVal[2],"%Y/%m/%d")))
+                    )
+        #remove empty elements
+        searchArgs<-searchArgs[sapply(searchArgs,function(x){!is.na(x)})]
+        df<-do.call(processSearch,searchArgs) #search pubmed
        })
       
       if(!is.null(df)){
@@ -242,11 +254,13 @@ shinyServer(function(input, output,session) {
                      
         incProgress(amount = runif(1,min=0.1,max=0.4)) #doesn't do much but visually pacifying because it looks like things are happening
                      
-        if(nrow(values$corpus)>300){
-          values$tsnePer<-70
+        if(nrow(values$corpus)>=1000){
+          values$tsnePer<-50
+        }else if(nrow(values$corpus)<=100){
+          values$tsnePer<-5
         }
         
-        #run t-SNE         
+        #run t-SNE 
         tsneObj<-runTSNE(tidyCorpus_df,check_duplicates=FALSE,perplexity=values$tsnePer)
         values$tsneObj<-tsneObj
       })
@@ -314,7 +328,7 @@ shinyServer(function(input, output,session) {
             tsneObj<-runTSNE(values$corpusTidy,perplexity = input$tsnePerplexity,check_duplicates=FALSE)
           },
           error = function(err){
-            paramOK<<-FALSE
+            paramOK<<-FALSE #dbl arrow needed
             sendSweetAlert(
               session = session,
               title = "t-SNE perplexity parameter too large!",
@@ -417,18 +431,26 @@ shinyServer(function(input, output,session) {
       filter(YearPub >= input$filtYearChoices[1] & YearPub <= input$filtYearChoices[2])
       
     if(!is.null(input$filtTopicChoices)){
+      filtTopicsChoices<-gsub("\\s+\\(n=[0-9]+\\)","",input$filtTopicChoices)
+      
       datSub<-datSub %>%
-        filter(tsneClusterNames %in% input$filtTopicChoices)
+        filter(tsneClusterNames %in% filtTopicChoices)
+    }
+    
+    #only include known open articles (i.e. has a PMC ID)
+    if(input$filtIsOpenChoices){
+      datSub <- datSub %>%
+        filter(!is.na(pmcID))
     }
       
     
     #Generating sample weights if weighted sampling is selected
     if(input$sampleWeight== "citation"){
       #calculate weights by citation #
-      maxCite<-max(as.numeric(as.character(datSub$pmcCitationCount)),na.rm=TRUE)
+      browser()
+      maxCite<-max(as.numeric(datSub$pmcCitationCount)+1,na.rm=TRUE) #add 1 so that none f the sampling proabilities are zero
         datSub<-datSub %>%
-          #mutate(sampWeight = ifelse(is.na(pmcCitationCount),1/maxCite,(as.numeric(as.character(pmcCitationCount))+1)/maxCite)) 
-          mutate(sampWeight = (pmcCitationCount+1)/maxCite) 
+            mutate(sampWeight = (as.numeric(pmcCitationCount)+1)/maxCite) 
       }else if(input$sampleWeight == "recency"){
         maxYear<-max(datSub$YearPub)
         minYear<-min(datSub$YearPub)
@@ -582,11 +604,16 @@ shinyServer(function(input, output,session) {
   # a button that initiates the analysis of the document corpus!
   output$topicClustInitiateButton<-renderUI({
     if(!is.null(values$corpus) & is.null(values$tsneObj)){
-      actionButton("analyzeCorpus",label="Inititate Topic Clustering")
+      if(nrow(values$corpus)>=150){
+        actionButton("analyzeCorpus",label="Inititate Topic Clustering")
+      }else{
+        #too few articles to properly run t-SNE
+        NULL
+      }
     }else if(!is.null(values$tsneObj)){
-      return(NULL)
+      NULL
     }else{
-      return(NULL)
+      NULL
     }
   })
   
@@ -604,6 +631,8 @@ shinyServer(function(input, output,session) {
       
     }else if(is.null(values$corpus)){
       HTML("<br> <strong>Nothing here yet!</strong> Search PubMed or load a prior analysis from the 'Search' menu item")
+    }else if(nrow(values$corpus)<=150){
+      HTML("Sorry, there are too few documents for topic clustering!")
     }else{
       NULL
     }
@@ -619,7 +648,7 @@ shinyServer(function(input, output,session) {
         tags$h3("Change t-SNE parameters"),
         br(),
         p("tsne parameters"),
-        numericInput("tsnePerplexity",label="Set tsne perplexity parameter",value=30,min=2,max = nrow(values$corpus)/2),
+        numericInput("tsnePerplexity",label="Set tsne perplexity parameter",value=values$tsnePer,min=5,max = nrow(values$corpus)/5),
         numericInput("tsneTheta",label="Set tsne theta parameter",value=0.5,min=0,max = 1.0),
         actionButton("reanalyze","Reanalyze"),
         circle = TRUE,status = "danger", icon = icon("gear"), width = "350px",
@@ -785,30 +814,27 @@ shinyServer(function(input, output,session) {
     }
   })
   
-  # #observer function that updates stratified choices dropdown
-  # observe({
-  #   if(!is.null(values$tsneObj) & !is.null(input$stratifiedChoice) & !is.null(input$filterGoButton)){
-  #     if(input$filterGoButton>0){
-  #     updateSelectInput(session,"stratifiedChoice",choices = c("Journal","Topic","Publication Year"))
-  #     }
-  #   }
-  # })
-  
+
   #Choice widget: Sampling weighting choices
   output$sampleSize<-renderUI({
     if(input$sampChoices %in% c("random","randomStratified") & !is.null(values$corpus)){
     
+      label <- "Choose total sample size"
+      value<-nrow(values$corpus)
+      
+      if(input$sampChoices == "randomStratified"){
+        label <- "Choose # of articles to sample per strata"
+        value <- 1
+      }
       numericInput("filtSampleSizeChoice",
-                   label = "Choose the sample size",
-                   value = round(nrow(values$corpus)/2),
-                   min = 2,
+                   label = label,
+                   value = value,
+                   min = 1,
                    max = nrow(values$corpus))
     }else{
       NULL
     }
   })
-  
-  #Choice widget: Sampling weighting choices
   
   #Filter widget: filter by journal
   output$filtJournal<-renderUI({
@@ -886,6 +912,35 @@ shinyServer(function(input, output,session) {
     }
   })
   
+  #Filter widget: filter by topic
+  output$filtArticleType<-renderUI({
+    if(!is.null(values$corpus$tsneClusterNames)){
+      #articles coming from differen journals
+      journ<-values$corpus %>%
+        ungroup()%>% #just in case
+        group_by(tsneClusterNames) %>%
+        count() %>%
+        arrange(-n) %>%
+        mutate(topicName = sprintf("%s (n=%d)",tsneClusterNames,n ))
+      
+      pickerInput(
+        inputId = "filtTopicChoices", 
+        label = "Select topics to include (default: select all)", 
+        width="100%",
+        choices =  journ$topicName,
+        selected = journ$topicName,
+        options = list(
+          `actions-box` = TRUE, 
+          size = 10,
+          `selected-text-format` = "count > 3"
+        ), 
+        multiple = TRUE
+      )
+    }else{
+      NULL
+    }
+  })
+  
   #Filter widget: filter by whether article is open source
   output$filtIsOpen<-renderUI({
     if(!is.null(values$corpus)){
@@ -944,8 +999,32 @@ shinyServer(function(input, output,session) {
     }
   })
   
-  #Button widget: Apply filters
+  #UI element : Summarize the current sample subset
+  output$subsetSummary<-renderUI({
+    
+    if(!is.null(values$corpusSubset)){
+      subSize  <- nrow(values$corpusSubset)
+      totalSize <- nrow(values$corpus)
+      
+      msg<-sprintf("<em>Sample Summary</em><br>A total of <b>%d documents were sampled </b> out of a total possible %d documents.",subSize,totalSize)
+      
+      if(input$sampChoices=="randomStratified"){
+        msg<-paste(msg,sprintf("Documents were sampled by <em>strata</em> according to <b>%s</b>, with <b>%d</b> documents  sampled per strata.", input$stratifiedChoice,input$filtSampleSizeChoice))
+      }
+      
+      if(input$sampleWeight =="citation"){
+        msg<-paste(msg,"Sampling weights were applied, giving greater weight to articles with higher PMC citation")
+      }else if(input$sampleWeight =="recency"){
+        msg<-paste(msg,"Sampling weights were applied, giving greater weight more recently published articles.")
+      }
+      
+      return(HTML(msg))
+    }else{
+      NULL
+    }
+  })
   
+  #Button widget: Apply filters
   output$filterButton<-renderUI({
     if(!is.null(values$corpus)){
       actionButton("filterGoButton",icon=icon("filter"),label="Subset Document Corpus")
@@ -985,14 +1064,14 @@ shinyServer(function(input, output,session) {
   output$yearPubPlot<-renderPlot({
     p<-NULL
     if(!is.null(values$corpus)){
-      p<- values$corpus %>%
+      p<-values$corpus %>%
         group_by(YearPub) %>%
         count()%>% 
         ggplot(aes(x=YearPub,y=n))+
         geom_bar(stat="identity")+
         ylab("total # of papers")+
         xlab("Publication Year")+
-        scale_x_continuous(limits=c(min(values$corpus$YearPub),max(values$corpus$YearPub)))+
+       # scale_x_continuous(limits=c(min(values$corpus$YearPub),max(values$corpus$YearPub)))+
         ggtitle("Publications per Year")+
         theme_bw()
     }
@@ -1024,7 +1103,7 @@ shinyServer(function(input, output,session) {
         labs(title="Top five journals where articles were published",
              x="Publication Year",
              y="% of documents published in that journal") +
-        scale_x_continuous(limits=c(min(values$corpus$YearPub),max(values$corpus$YearPub)))+
+        #scale_x_continuous(limits=c(min(values$corpus$YearPub),max(values$corpus$YearPub)))+
         scale_colour_brewer(palette = "Set2")+
         theme_bw()
     }
@@ -1064,7 +1143,7 @@ shinyServer(function(input, output,session) {
              x="Publication Year",
              y="# of documents containing the Mesh Term") +
         scale_colour_tableau("tableau10medium")+
-        scale_x_continuous(limits=c(min(values$corpus$YearPub),max(values$corpus$YearPub)))+
+        #scale_x_continuous(limits=c(min(values$corpus$YearPub),max(values$corpus$YearPub)))+
         theme_bw()
       
     }
@@ -1091,7 +1170,12 @@ shinyServer(function(input, output,session) {
       meshTermsCount<-meshTermsCount %>%
         mutate(freq = n/nrow(meshTermsCount))
       
-      p<-wordcloud(meshTermsCount$meshTerms,meshTermsCount$freq,max.words=50,rot.per=0,main="mesh term wordcloud")
+      p<-wordcloud(meshTermsCount$meshTerms,meshTermsCount$freq,
+                   max.words=50,
+                   scale=c(2,0.5),
+                   min.freq=2,
+                   rot.per=0,
+                   main="mesh term wordcloud")
     }
     
     p
@@ -1101,12 +1185,14 @@ shinyServer(function(input, output,session) {
   #now, make a list of the 10 most cited articles (according to PMC)
   
   output$topCorpusArticles<-renderUI({
+
     topPapers<-""
     
     if(!is.null(values$corpus)){
       topRef<-values$corpus%>%
-       # mutate(pmcCitationCount = as.numeric(as.character(pmcCitationCount))) %>% #for some reason this is a factor
+        mutate(pmcCitationCount = as.numeric(pmcCitationCount)) %>% #for some reason this is a factor
         ungroup()%>%
+        filter(pmcCitationCount>0)%>%
         arrange(-pmcCitationCount)%>%
         top_n(10,pmcCitationCount)
       
@@ -1235,7 +1321,7 @@ shinyServer(function(input, output,session) {
         labs(title="Cluster Membership Over Time",
              xlab = "#of articles published",
              ylab = "Year of Publication")+
-        scale_x_continuous(limits=c(min(values$corpus$YearPub),max(values$corpus$YearPub)))+
+        #scale_x_continuous(limits=c(min(values$corpus$YearPub),max(values$corpus$YearPub)))+
         theme_bw()
     }
     

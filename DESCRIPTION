@@ -9,7 +9,7 @@ BugReports: https://github.com/amcrisan/adjutant/issues
 Depends: R (>= 3.1.2)
 Imports: dplyr,
         ggplot2,
-        purr,
+        purrr,
         plyr,
         DT,
         tidytext,

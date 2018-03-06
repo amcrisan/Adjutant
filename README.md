@@ -10,9 +10,21 @@ If you use Adjutant, please cite:
 > Adjutant: an R-based tool to support topic discovery for systematic and literature review
 > url: https://github.com/amcrisan/Adjutant/
 
+## Download
+
+Download the latest development code of Adjutant from GitHub using [devtools](https://cran.r-project.org/package=devtools) with
+
+```R
+devtools::install_github("amcrisan/Adjutant")
+```
+
 ## Demo
 
+Adjutant can be used through it's attendant Shiny Application, or within your own R script. It can be used just for looking up and downloading articles from PubMed to R, or to perform a topic clustering analysis and sophisticated document sampling. 
+
 ### Using Adjuntant Shiny App
+
+*Coming soon*
 
 ### Using Adjutant within an R script
 
@@ -36,7 +48,7 @@ tidy_df<-tidyCorpus(corpus = df)
 ```
 **Step 3: Performing a dimensionality reduction using t-SNE**
 
-To learn more about t-SNE, please consult this [excellent article in Distill Pub](https://distill.pub/2016/misread-tsne/).
+To learn more about t-SNE, please consult this [excellent article in Distill Pub](https://distill.pub/2016/misread-tsne/). Generally, Adjutant's topic clustering works best when there are a larger number of diverse articles. It is still possible to get reasonable results with a smaller number of articles (fewer than 1,000 for example), and with a very homogenous dataset (for example just recent zika virus articles), but more general searches with large number of documents work best.
 
 ```R
 tsneObj<-runTSNE(tidy_df,check_duplicates=FALSE)
@@ -50,7 +62,9 @@ ggplot(df,aes(x=tsneComp1,y=tsneComp2))+
   theme_bw()
 ```
 
-** Step 4: Perform an unsupervised clustering using hdbscan**
+![](https://user-images.githubusercontent.com/5395870/36921077-d84ac778-1e17-11e8-8e57-a1d8f0c19808.png)
+
+**Step 4: Perform an unsupervised clustering using hdbscan**
 
 If you use hdbscan through Adjutant, the result will be the Adjuntant optimized hdbscan minPts parameter. You can also just use hdbscan directly on the result t-SNE dimensionally reduced data and sort out what the best hbdscan minPts parameter is for yourself. 
 
@@ -77,8 +91,9 @@ ggplot(df,aes(x=tsneComp1,y=tsneComp2,group=tsneCluster))+
   scale_alpha_manual(values=c(1,0),name="cluster status")+ #remove the cluster for noise
   theme_bw()
 ```
+![](https://user-images.githubusercontent.com/5395870/36921074-d6be519a-1e17-11e8-98d5-a8b63e87623c.png)
 
-** Step 5: Naming the clusters**
+**Step 5: Naming the clusters**
 
 Adjutant has a function called **getTopTerms** that will automatically name a cluster according to its the top two most commonly occuring terms. If there are ties, it will return all 
 
@@ -108,15 +123,8 @@ ggplot(df,aes(x=tsneComp1,y=tsneComp2,group=tsneClusterNames))+
   scale_alpha_manual(values=c(1,0),name="cluster status")+ #remove the cluster for noise
   theme_bw()
 ```
+![](https://user-images.githubusercontent.com/5395870/36920256-fe85e1d2-1e14-11e8-9c84-6bb7c8b13662.png)
 
-** Step 6: Go forth and analyze some more! **
+**Step 6: Go forth and analyze some more!**
 
 You can use df, tidy_df, or any other object produced by Adjutant in your own analysis!
-
-## Download
-
-Download the latest development code of Adjutant from GitHub using [devtools](https://cran.r-project.org/package=devtools) with
-
-```R
-devtools::install_github("amcrisan/Adjutant")
-```

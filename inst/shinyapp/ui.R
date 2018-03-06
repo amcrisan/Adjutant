@@ -39,16 +39,29 @@ body<-dashboardBody(
               btnSearch = icon("search"), 
               btnReset = icon("remove"), 
               width = "100%"
+          ),
+          br(),
+          fluidRow(
+            column(6,
+              h4("Search Options"),
+              textInput("retmax",label="Maximum # of articles to retrieve (leave blank to retreieveall possible articles)",value=NA),
+              checkboxInput("dateRange","Specify Date Range?",value=FALSE),
+              conditionalPanel("input.dateRange == true",
+                               dateRangeInput("dateRangeVal",label="Specify a Date Range for articles")
+              )
+            ),
+            column(6,
+              h4("Analysis Saving Options"),
+              em("Save Analysis?"),
+              switchInput(inputId = "saveAnalysis",label=NULL,onLabel = "YES",offLabel = "NO", value = TRUE,inline=TRUE,width='350px'),
+              uiOutput("analysisFileName")
+            )
           )
         ),
         tabPanel("Load Data",
           fileInput("prevAnalysis", "Load a RDS file from previous run (see 'storedRuns' folder or load example)",width = "100%")
         )
-      ),
-      hr(),
-      HTML("<em>Search Options</em>"),
-      switchInput(inputId = "saveAnalysis",label="Save Analysis?", value = TRUE),
-      uiOutput("analysisFileName")
+      )
     ),
     #------------------------------
     # Search Summary & Results
@@ -91,8 +104,8 @@ body<-dashboardBody(
             )
           ),
           hr(),
-          h4("Top 10 Most Referenced Papers"),
-          em("Most reference articles according to PubMed Central internal counts, which don't match Google Scholar but are a reasonable heuristic"),
+          h4("Most Referenced Papers"),
+          em("Most reference articles according to PubMed Central internal counts, which don't match Google Scholar but are a reasonable heuristic. Top ten articles are returned, but there may be fewer if the search is limited to more recent publications that have yet to be cited."),
           br(),
           br(),
           fluidRow( #largely to keep consistent formatting
@@ -169,11 +182,12 @@ body<-dashboardBody(
         ),
         column(width = 4,
           uiOutput("weightedSampleOptions"),
-          uiOutput("stratifiedSampleOptions")
+          uiOutput("stratifiedSampleOptions"),
+          uiOutput("sampleSize")
         ),
         column(width = 4,
-          uiOutput("sampleSize"),
           uiOutput("filterButton"),
+          uiOutput("subsetSummary"),
           br(),
           uiOutput("downloadSubsetData")
         )
