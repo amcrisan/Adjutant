@@ -1,6 +1,15 @@
-
-#Run the initial query string
+#' Processing PubMed Search
+#'
+#' @description Wrapper interface for RISmed and adding additional article metadata.
+#' @param query query for PubMed search
+#' @param demoversion hard limit on PubMED retrieved records to 1000. [Default: FALSE]
+#' @param ... arguements passed to RISmed::EUtilsSummary method
+#'
+#' @return corpus 
+#'
+#' @examples See online useage demonstration:https://github.com/amcrisan/Adjutant#demo
 processSearch<-function(query=NULL,demoversion=FALSE, ...){
+  
   addedParam<- list(...)
   print(addedParam)
   #Running Query on Pubmed - kinda just gets me PMIDS
@@ -48,9 +57,6 @@ formatData<-function(ids = NULL){
     
     tmpids<-ids #sanity check for when results suddenly seem to get dropped
     pubResults<-EUtilsGet(paste0(tmpids,collapse = ","),type="efetch",db="pubmed")
-    
-    
-    EUtilsGet("29492318",type="efetch",db="pubmed")
     
     #make sure that results out = result in. EUtils 
     #its an odd fringe case, but this does actually happen

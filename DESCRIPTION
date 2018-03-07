@@ -27,3 +27,4 @@ Imports: dplyr,
 License: MIT + file LICENSE
 LazyData: true
 Encoding: UTF-8
+RoxygenNote: 6.0.1
