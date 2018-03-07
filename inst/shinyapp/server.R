@@ -28,9 +28,6 @@ set.seed(416) #repping the 6ix!
 
 #Query Strings used for testing testing - I use a couple of example here
 queryString<-"(outbreak OR epidemic OR pandemic) AND genom*"
-#queryString<-'"mycobacterium tuberculosis "[All Fields] AND "genome"[All Fields] AND (("2016/01/01"[PDAT] : "2017/10/01"[PDAT]) AND English[lang]) AND (("2016/01/01"[PDAT] : "2017/10/01"[PDAT]) AND English[lang])'
-#queryString<-'"mycobacterium tuberculosis "[All Fields] AND (("2016/10/01"[PDAT] : "2017/10/01"[PDAT]) AND English[lang]) AND (("2016/01/01"[PDAT] : "2017/10/01"[PDAT]) AND English[lang])'
-#queryString<-'(("prostatic neoplasms"[MeSH Terms] OR ("prostatic"[All Fields] AND "neoplasms"[All Fields]) OR "prostatic neoplasms"[All Fields] OR ("prostate"[All Fields] AND "cancer"[All Fields]) OR "prostate cancer"[All Fields]) AND ("genomics"[MeSH Terms] OR "genomics"[All Fields])) AND ("2014/10/01"[PDAT] : "2014/12/01"[PDAT])'
 #queryString<-'"IEEE transactions on visualization and computer graphics"[Journal]'
 
 
@@ -68,7 +65,7 @@ shinyServer(function(input, output,session) {
     totalDocs = 0,
     corpus = NULL, #original document corpus 
     corpusTidy = NULL, # tidyText version of corpus
-    corpusSubset = NULL,
+    corpusSubset = NULL, #subset of the data
     tsneObj = NULL,
     analysisProgress = FALSE,
     tnsePlot = NULL,
@@ -88,7 +85,12 @@ shinyServer(function(input, output,session) {
     clustInfoDetailsUI = NULL,
     clustInfoClustOverview = NULL,
     clustInfoDetailsPlot = NULL,
-    pTsneFinal=NULL
+    pTsneFinal=NULL,
+    #---------------------------
+    # For the demo version only
+    #---------------------------
+    reanalyzeNum = 0,
+    demoVersion=FALSE
   )
 
   #------------------------------------------------------------------------------------
@@ -121,7 +123,7 @@ shinyServer(function(input, output,session) {
                       
         #creating a vector list of arguements
         searchArgs<-list(query = ifelse(is.null(input$searchQuery),NA,input$searchQuery),
-                    demoversion = FALSE,
+                    demoversion = values$demoVersion,
                     retmax = ifelse(input$retmax == "",NA,as.numeric(input$retmax)), #as numeric failure defaults to NA
                     mindate = ifelse(!input$dateRange,NA,as.character(format(input$dateRangeVal[1],"%Y/%m/%d"))),
                     maxdate = ifelse(!input$dateRange,NA,as.character(format(input$dateRangeVal[2],"%Y/%m/%d")))
@@ -310,7 +312,14 @@ shinyServer(function(input, output,session) {
 
   #Allowing the user to enter custom tsne parameters, and re-running the results
   observeEvent(input$reanalyze,{
-    
+    if(values$demoVersion & values$reanalyzeNum>1){
+      sendSweetAlert(
+        session = session,
+        title = "No more re-analysis for you!",
+        text = "The demo version of Adjutant limits the number of times a corpus can be reanalyzed ",
+        type = "error"
+      )
+    }
     if(input$tsnePerplexity!=values$tsnePer | input$tsneTheta!=values$tsneTheta){
       paramOK<-TRUE
       
@@ -913,7 +922,7 @@ shinyServer(function(input, output,session) {
   })
   
   #Filter widget: filter by topic
-  output$filtArticleType<-renderUI({
+  output$filtTopic<-renderUI({
     if(!is.null(values$corpus$tsneClusterNames)){
       #articles coming from differen journals
       journ<-values$corpus %>%
