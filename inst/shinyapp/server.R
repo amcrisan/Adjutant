@@ -49,10 +49,13 @@ updatecheckboxGroupButtons_Custom <- function (session, inputId, value = NULL) {
  session$sendInputMessage(inputId, message)
 }
 
-#checking if the storedRuns folder exists, and create one if it does not
-if(!file.exists("./storedRuns/")){
-  currDir<-getwd()
-  dir.create(file.path(currDir, "storedRuns"))
+#checking if the storedAnalysis folder exists, and create one if it does not
+#this allows the analysis to be saved along the way
+currDir<-getwd()
+currDir<-gsub("/shinyapp","",currDir) %>% gsub("/inst","",.)
+
+if(!dir.exists(paste0(currDir,"/storedAnalysis/"))){
+  dir.create(file.path(currDir, "/storedAnalysis/"))
 }
 
 ## START THE SHOW
@@ -150,7 +153,8 @@ shinyServer(function(input, output,session) {
         
         # check if the  user entered a file name
         if(input$saveAnalysis){ 
-          savedFileName<-paste("./storedRuns/", values$fileName,".RDS", sep = "")
+          browser()
+          savedFileName<-paste(currDir,"/storedAnalysis/", values$fileName,".RDS", sep = "")
           saveRDS(df,file=savedFileName)
         }
         
@@ -191,7 +195,7 @@ shinyServer(function(input, output,session) {
         sendSweetAlert(
           session = session, 
           title = "Please Clear Analysis First!", 
-          text = "Please clear the current analysis (see option in sidebar panel)  before entering a new search term or loading a previous analysis (don't worry, all data from you current analysis is automatically saved in the 'prior runs' folder", 
+          text = "Please clear the current analysis (see option in sidebar panel)  before entering a new search term or loading a previous analysis (don't worry, all data from you current analysis is automatically saved in the 'storedAnalysis' folder", 
           type = "error"
         )
         
@@ -248,7 +252,7 @@ shinyServer(function(input, output,session) {
         values$corpusTidy<-tidyCorpus_df
         
         if(input$saveAnalysis){
-          savedFileName<-paste("./storedRuns/", values$fileName,"_tidyText.RDS", sep = "")
+          savedFileName<-paste("./storedAnalysis/", values$fileName,"_tidyText.RDS", sep = "")
           saveRDS(values$corpusTidy,file=savedFileName)
         }
         
@@ -307,7 +311,7 @@ shinyServer(function(input, output,session) {
           dplyr::filter(tsneClusterNames != "Noise")
         })
       if(input$saveAnalysis){
-        savedFileName<-paste("./storedRuns/", values$fileName,"_topicClusters.RDS", sep = "")
+        savedFileName<-paste("./storedAnalysis/", values$fileName,"_topicClusters.RDS", sep = "")
         saveRDS(values$corpus,file=savedFileName)
       }
     }
@@ -526,7 +530,7 @@ shinyServer(function(input, output,session) {
     gc()
     
     if(input$saveAnalysis){
-      savedFileName<-paste("./storedRuns/", values$fileName,"_subset.RDS", sep = "")
+      savedFileName<-paste("./storedAnalysis/", values$fileName,"_subset.RDS", sep = "")
       saveRDS(values$corpusSubset,file=savedFileName)
     }
       
@@ -1356,7 +1360,7 @@ shinyServer(function(input, output,session) {
   output$searchInfoStatement<-renderUI({
     HTML("<b><big>Search PubMed</big></b> <a href='#searchInfo'data-toggle='collapse'><small><em>(show search details)</small></em></a>
            <div id='searchInfo' class= 'collapse'>
-         Begin your search here by entering a valid <a href='https://www.ncbi.nlm.nih.gov/pubmed/' target='_blank'><strong>PubMed</strong></a> search string. To form more specific search strings, please consult PubMed directly and copy and paste the PubMed generated search string here. You can also <strong> load prior analyses </strong>, which are automatically stored in the 'stored runs' folder everytime you use Adjutant</div>")
+         Begin your search here by entering a valid <a href='https://www.ncbi.nlm.nih.gov/pubmed/' target='_blank'><strong>PubMed</strong></a> search string. To form more specific search strings, please consult PubMed directly and copy and paste the PubMed generated search string here. You can also <strong> load prior analyses </strong>, which are automatically stored in the 'storedAnalysis' folder everytime you use Adjutant</div>")
   })
   
   
@@ -1390,7 +1394,7 @@ shinyServer(function(input, output,session) {
   output$sampleInfoStatement<-renderUI({
     HTML("<b><big>Sample Documents</big></b> <a href='#sampleDocsInfo'data-toggle='collapse'><small><em>(show document sampling details)</small></em></a>
          <div id='sampleDocsInfo' class= 'collapse'>
-         Document sampling allows you to define a subset of the document corpus for additional analysis that Adjutant does not support. For example, maybe you only want articles from 2015 and beyond, but your document corpus contains articles ranging from 1998 - 2017, in this scenario you can use this document sampling area to get those 2015 and beyond articles. You might wonder, 'why not just modify my PubMed search so that I only have articles from 2015 and beyond?'. The answer is that text mining works best when there's more data - so if you have many years of data you'll get better defined topic clusters, and afterwards you can define the subset of articles that you are most interested in. You can export the sampled documents to your computer in a CSV format. <strong>Be sure to also look at the 'stored runs' folder for automatically saved datasets.</strong><br>
+         Document sampling allows you to define a subset of the document corpus for additional analysis that Adjutant does not support. For example, maybe you only want articles from 2015 and beyond, but your document corpus contains articles ranging from 1998 - 2017, in this scenario you can use this document sampling area to get those 2015 and beyond articles. You might wonder, 'why not just modify my PubMed search so that I only have articles from 2015 and beyond?'. The answer is that text mining works best when there's more data - so if you have many years of data you'll get better defined topic clusters, and afterwards you can define the subset of articles that you are most interested in. You can export the sampled documents to your computer in a CSV format. <strong>Be sure to also look at the 'storedAnalysis' folder for automatically saved datasets.</strong><br>
          </div>")
   })
   
