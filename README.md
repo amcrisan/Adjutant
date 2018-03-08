@@ -42,18 +42,6 @@ Now we can install Adjutant! So type the following:
 devtools::install_github("amcrisan/Adjutant")
 ```
 
-#### Starting Adjutant
-
-With Adjutant installed, you just need to type two commands to get Adjutant going.
-
-```R
-library(adjutant) #this gets R ready to run Adjutant
-library(shiny) #this is the method R uses to run Adjutant
-
-
-```
-
-
 ## Demo
 
 Adjutant can be used through it's attendant Shiny Application, or within your own R script. It can be used just for looking up and downloading articles from PubMed to R, or to perform a topic clustering analysis and sophisticated document sampling. 
@@ -61,6 +49,16 @@ Adjutant can be used through it's attendant Shiny Application, or within your ow
 ### Using Adjuntant Shiny App
 
 *Video coming soon*
+
+With Adjutant installed, you just need to type two commands to get Adjutant going.
+
+```R
+library(adjutant) #this gets R ready to run Adjutant
+library(shiny) #this is the method R uses to run Adjutant
+
+runAdjutant() #this will launch Adjutant
+```
+
 
 ### Using Adjutant within an R script
 It is also possible to use Adjutant within your own code, bypassing the Shiny application all together.
