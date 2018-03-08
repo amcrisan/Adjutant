@@ -49,7 +49,11 @@ updatecheckboxGroupButtons_Custom <- function (session, inputId, value = NULL) {
  session$sendInputMessage(inputId, message)
 }
 
-
+#checking if the storedRuns folder exists, and create one if it does not
+if(!file.exists("./storedRuns/")){
+  currDir<-getwd()
+  dir.create(file.path(currDir, "storedRuns"))
+}
 
 ## START THE SHOW
 shinyServer(function(input, output,session) {
