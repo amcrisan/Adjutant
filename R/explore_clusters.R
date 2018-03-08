@@ -1,4 +1,4 @@
-#find the largest cluster that is near where a participant is mousing
+#find the largest cluster that is near where a participant is double clicking on
 clickedClusterSum<-function(corpus =NULL, e = NULL){
   if(!is.null(e)){
     selPts<-nearPoints(corpus, e, threshold=10,xvar = "tsneComp1", yvar = "tsneComp2")
@@ -10,12 +10,7 @@ clickedClusterSum<-function(corpus =NULL, e = NULL){
         dplyr::count()%>%
         ungroup()%>%
         top_n(1,-n)
-      
-      #tmp<-corpus %>% 
-      #  filter(tsneClusterNames == tmp$tsneClusterNames[1])%>%
-      #  group_by(tsneClusterNames)%>% #this is literally *just* to keep the stupid name
-      #  dplyr::count()
-      
+
       return(tmp)
     }else{
       return(NULL)
@@ -28,8 +23,6 @@ clickedClusterSum<-function(corpus =NULL, e = NULL){
 
 #Print a summary of cluster text
 clusterSummaryText<-function(corpus = NULL,clustSelected=NULL){
-  #hovMsg<-HTML("<em>Brush (drag mouse to form box)</em> over points in the <em>cluster graph (left)</em> to get summary information about the cluster")
-  
   tmp <- corpus %>%
     filter(tsneClusterNames == clustSelected)
   
@@ -43,10 +36,11 @@ clusterSummaryText<-function(corpus = NULL,clustSelected=NULL){
 
 #get some highly cited (by PMC internal count) papers from a cluster
 getTopPapers<-function(corpus=NULL,selectedCluster=NULL){
+  
   topPapers<-""
   topRef<-corpus %>%
     filter(tsneClusterNames == selectedCluster) %>%
-    mutate(pmcCitationCount = as.numeric(as.character(pmcCitationCount)))%>% #for some reason, this is a factor..
+    mutate(pmcCitationCount = as.numeric(as.character(pmcCitationCount)))%>% 
     filter(!is.na(pmcCitationCount))
     
     
@@ -80,8 +74,21 @@ getTopPapers<-function(corpus=NULL,selectedCluster=NULL){
   return(topPapers)
 }
 
-#a function that names clusters
+
+#' Naming clusters
+#'
+#' @param clustPMID 
+#' @param topNVal 
+#' @param clustValue 
+#' @param tidyCorpus 
+#'
+#' @import dplyr
+#' @return topWord : a string of top two terms for a given cluster
+#' @export
+#'
+#' @examples See online useage demonstration:https://github.com/amcrisan/Adjutant#demo
 getTopTerms<-function(clustPMID=NULL,topNVal=1,clustValue = NA,tidyCorpus = NULL){
+  
   clustValue<-clustValue[1]
   
   if(clustValue == 0)

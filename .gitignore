@@ -2,5 +2,6 @@
 .Rhistory
 .RData
 .Ruserdata
+*.Rporj
 
-./storedRuns
+./inst/shinappy/storedRuns

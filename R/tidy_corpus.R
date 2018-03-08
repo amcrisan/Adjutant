@@ -1,14 +1,23 @@
-#Apply glorious tidy text methods. Just use one term for an overview
-#commonly used words in the english language.
-#note that I am indebted to Julia and David: http://tidytextmining.com/
+#' Tidying Up the PubMed Corpus
+#'
+#' @description Creates a tidytext corpus from the PubMed articles titles and abstracts. Adjutant generally follows the approach presented in  'Text Mining with R' (https://www.tidytextmining.com/tidytext.html). 
+#' @param corpus 
+#'
+#' @return Tidy Text Corpus
+#' @import tidytext
+#' @import tm
+#' @import dplyr
+#' @import SnowballC
+#' 
+#' @export
+#'
+#' @examples see online useage demonstration:https://github.com/amcrisan/Adjutant#demo
 tidyCorpus<- function(corpus=NULL){
-  
   data(stop_words)
   #remove some common terms that will occur in abstract
   customStopTerms<-data.frame(word=c("abstract", "text", "abstracttext","introduction","background","method","methods","methodology","conclusion","conclusions","objectives","results","result","we","materials","purpose","significance","significant","mg","http","com"))
   
   # Make text tidy!
-  #withProgress(message = 'Formatting data for text analysis', value = 0.1, {
   tidyCorpus_df <- corpus[,c("PMID","Title","Abstract")] %>%
     mutate(text = paste0(Title,Abstract)) %>%
     unnest_tokens(word, text) %>%
@@ -20,8 +29,7 @@ tidyCorpus<- function(corpus=NULL){
     filter(!str_detect(word,"\\d")) %>% #get rid of any numbers
     mutate(wordStemmed = wordStem(word)) %>% #finally, get the word stems (Porter's algorithm)
     select(PMID,word,wordStemmed)
-  #})
-  
+
   #Calculate TF IDF
   #withProgress(message = 'Calculating TD_IDF metric', value = 0.1, { 
   # I will now also add the term frequency document frequency values.

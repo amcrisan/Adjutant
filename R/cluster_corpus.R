@@ -1,7 +1,18 @@
-#runs tSNE, paramters can be modified
-# TO DO : doesn't work super well on very small corpuses because of tsne params
-# either die gracefully or also improve param selection
+#' Wrapped for rTSNE
+#'
+#' @details A wrapper for the t-SNE method that creates a document term matrix from a tidy corpus, run t-SNE, and provides a cleaned up data frame output for further analysis.
+#' @param tidyCorpus_df A tidy corpus. Run the "tidyCorpus" method to generate the expected input
+#' @param ... parameters that can be passed to rTSNE
+#'
+#' @import dplyr
+#' @import Rtsne
+#' 
+#' @return a data frame with with x,y t-SNE co-ordinates for
+#' @export
+#'
+#' @examples See online useage demonstration:https://github.com/amcrisan/Adjutant#demo
 runTSNE<-function(tidyCorpus_df=NULL, ...){
+  
 
   dtm<-cast_dtm(tidyCorpus_df,PMID,wordStemmed,tf_idf)
   
@@ -33,28 +44,34 @@ runHDBSCAN<-function(corpus=NULL,...){
   return(cl)
 }
 
-# A function that tries to find a sweet spot in tSNE HBSCAN
-# The point here is "good enough" parameters and not "globally optimal parameters"
-# My defintion of good parameters is set that puts the most documents into non-noise clusters,
-# but there is also going to be a penalization on having too many clusters
-# Also keeping track (and overtime discounting) articles that just never cluster into anything
-# (yes those exist, it's a level of noise I am trying to remove). 
 
-optimalParam<-function(corpus=NULLL){
-  #altnernative to HBDSCAN clustering
-  nDocs<-nrow(corpus)
-  minPtsVals<-c(10,20,25,30,50,75,100,125,200)
-  if(nDocs>50 & nDocs<100){
-    minPtsVals<-c(5,10,20,30,50)
-  }else if(nDocs>100 & nDocs<500){
-    minPtsVals<-c(5,minPtsVals[1:(length(minPtsVals)-2)])
-  }else if(nDocs>500 & nDocs<1000){
-    minPtsVals<-c(minPtsVals,500) #trying out a bunch of different values
-  }else if(nDocs > 1000){
-    minPtsVals<-c(minPtsVals,500,1000)
+#' Find Optimal HDBSCAN parameters
+#'
+#' @details A function that tries to find the best possible minimum cluster size parameter (minPts) for HBSCAN. This method relies on the inputs from the runTSNE method. The appraoch of this method aims for a "good enough" classifcation rather than a globally optimized solution. The defintion of "good enough" for this function is the minimum number of clusters that best explain the data. To do this, the function first derives clusters  using the hdbscan algorithm (from the dbscan package) for minPts values to be tested.  The method then identifies the optimal minPts parameters by leveraging goodness-of-fit measurements derived from linear models, specifically the adjusted R^2 and the Bayesian Information Criteria (BIC); thus each minPts parameter value tested will have an associated R^2 and BIC measure. Adjutant makes this calculation by fitting separate linear models to each of the two t-SNE dimensions, where for each linear model the t-SNE component co-ordinates are used as the dependent variable and the clusters are used as the independent variables. Each cluster is a vector of membership probabilities, from 0 (not in the cluster) to 1 (definitely a cluster member). The adjusted R^2 between the two component models are multiplied, and the BICs are averaged. To choose the optimal minPts parameters, the method than identifies all minPts values with an adjusted R^$ within 0.05 of the best performing minPts value, and among those different options selects the minPts value with the lowest BIC.
+#' 
+#' @param corpus the optimial cluster classification for each article
+#'
+#' @import dbscan
+#' @import dplyr
+#' @return data frame of clusters for each PMID
+#' @export
+#'
+#' @examples see online useage demonstration:https://github.com/amcrisan/Adjutant#demo
+optimalParam<-function(corpus=NULLL,minPtsVal = NULL){
+
+  if(is.null(minPtsVal)){
+    nDocs<-nrow(corpus)
+    minPtsVals<-c(10,20,25,30,50,75,100,125,200)
+    if(nDocs>50 & nDocs<100){
+      minPtsVals<-c(5,10,20,30,50)
+    }else if(nDocs>100 & nDocs<500){
+      minPtsVals<-c(5,minPtsVals[1:(length(minPtsVals)-2)])
+    }else if(nDocs>500 & nDocs<1000){
+      minPtsVals<-c(minPtsVals,500) #trying out a bunch of different values
+    }else if(nDocs > 1000){
+      minPtsVals<-c(minPtsVals,500,1000)
+    }
   }
-  
-  
   #storing all the runs
   optValues<-vector("list",length(minPtsVals))
   

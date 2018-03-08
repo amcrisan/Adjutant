@@ -2,12 +2,16 @@
 #'
 #' @description Wrapper interface for RISmed and adding additional article metadata.
 #' @param query query for PubMed search
-#' @param demoversion hard limit on PubMED retrieved records to 1000. [Default: FALSE]
+#' @param demoversion hard limit on PubMED retrieved records to 1000. Mainly used for easy transition to demo app version of Adjutant  [Default: FALSE]
 #' @param ... arguements passed to RISmed::EUtilsSummary method
 #'
 #' @return corpus 
 #'
 #' @examples See online useage demonstration:https://github.com/amcrisan/Adjutant#demo
+#' @import RISmed
+#' @import dplyr
+#' @import jsonlite
+#' @export
 processSearch<-function(query=NULL,demoversion=FALSE, ...){
   
   addedParam<- list(...)
