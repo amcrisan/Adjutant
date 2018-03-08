@@ -3,7 +3,7 @@
 #' @description Wrapper interface for RISmed and adding additional article metadata.
 #' @param query query for PubMed search
 #' @param demoversion hard limit on PubMED retrieved records to 1000. Mainly used for easy transition to demo app version of Adjutant  [Default: FALSE]
-#' @param ... arguements passed to RISmed::EUtilsSummary method
+#' @param ... arguments passed to RISmed::EUtilsSummary method
 #'
 #' @return corpus 
 #'
@@ -11,11 +11,12 @@
 #' @import RISmed
 #' @import dplyr
 #' @import jsonlite
+#' @import stringr
 #' @export
 processSearch<-function(query=NULL,demoversion=FALSE, ...){
   
   addedParam<- list(...)
-  print(addedParam)
+  
   #Running Query on Pubmed - kinda just gets me PMIDS
   resQ1 <- EUtilsSummary(query=query, type='esearch', db='pubmed', ...)
   

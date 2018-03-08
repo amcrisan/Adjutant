@@ -11,7 +11,7 @@ processSearch(query = NULL, demoversion = FALSE, ...)
 
 \item{demoversion}{hard limit on PubMED retrieved records to 1000. Mainly used for easy transition to demo app version of Adjutant  [Default: FALSE]}
 
-\item{...}{arguements passed to RISmed::EUtilsSummary method}
+\item{...}{arguments passed to RISmed::EUtilsSummary method}
 }
 \value{
 corpus

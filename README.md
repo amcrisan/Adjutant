@@ -18,17 +18,62 @@ Download the latest development code of Adjutant from GitHub using [devtools](ht
 devtools::install_github("amcrisan/Adjutant")
 ```
 
+### Download: Super new to R version 
+
+**Video coming soon**
+
+#### Getting R and Install Adjutant
+Maybe you want to use Adjutant (you read about it, you saw it somehwere, you're my mom), but you don't really know what R is, so you're not sure where to start. 
+
+First, you need to [download R](https://cloud.r-project.org/) onto your computer. You may run into trouble if you work in a place that prevents you from downloading and installing applications to your computer. This means you might need to us a homer computer (but also talk to your IT team about why R is the best thing ever). You can also [download RStudio](https://www.rstudio.com/products/rstudio/download/), a useful tool to running R code and working on your own R code. You don't need RStudio run Adjutant, but it can make things easier.
+
+Second, you need to install the [devtools package](https://cran.r-project.org/web/packages/devtools/index.html). You can do this by opening R (can be an icon on your desktop) or by opening RStudio.
+
+Within R or the RStudio console, type the following:
+
+```R
+install.packages("devtools")
+```
+
+Now we can install Adjutant! So type the following:
+
+```R
+#now you type
+devtools::install_github("amcrisan/Adjutant")
+```
+
+#### Starting Adjutant
+
+With Adjutant installed, you just need to type two commands to get Adjutant going.
+
+```R
+library(adjutant) #this gets R ready to run Adjutant
+library(shiny) #this is the method R uses to run Adjutant
+
+
+```
+
+
 ## Demo
 
 Adjutant can be used through it's attendant Shiny Application, or within your own R script. It can be used just for looking up and downloading articles from PubMed to R, or to perform a topic clustering analysis and sophisticated document sampling. 
 
 ### Using Adjuntant Shiny App
 
-*Coming soon*
+*Video coming soon*
 
 ### Using Adjutant within an R script
-
 It is also possible to use Adjutant within your own code, bypassing the Shiny application all together.
+
+**Step 0: Load Adjutant**
+
+To run this demo the first thing you need to do is load Adjutant (once you've downloaded it), and some additional packages for analysis.
+
+```R
+library(adjutant)
+library(dplyr)
+library(ggplot2)
+```
 
 **Step 1: Downloading data from PubMed to your computer**
 

@@ -1,4 +1,4 @@
-library(shiny)
+library(adjutant) #!! We can do this now!!
 library(RISmed)
 library(rms)
 library(purrr)
@@ -19,10 +19,10 @@ library(wordcloud)
 
 
 #additional analytic functions
-source("../../R/process_pubmed.R")
-source("../../R/tidy_corpus.R")
-source("../../R/cluster_corpus.R")
-source("../../R/explore_clusters.R")
+# source("../../R/process_pubmed.R")
+# source("../../R/tidy_corpus.R")
+# source("../../R/cluster_corpus.R")
+# source("../../R/explore_clusters.R")
 
 set.seed(416) #repping the 6ix! 
 
