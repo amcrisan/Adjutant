@@ -42,15 +42,18 @@ body<-dashboardBody(
           )
         ),
         tabPanel("Load Data",
-          fileInput("prevAnalysis", "Load a RDS file from previous run (see 'storedRuns' folder or load example)",width = "100%")
+                 uiOutput("loadAnalysisUI"),
+                 actionButton("chooseDir","Choose Different Directory"),
+                 br(),
+                 HTML("<small><em> Note: All files will be saved to the analysis directory you select</em></small>")
         )
       ),
-      br(),
+      hr(),
       fluidRow(
         column(6,
                conditionalPanel("input.loadData == 'Enter Query'",
                  h4("Search Options"),
-                 textInput("retmax",label="Maximum # of articles to retrieve (leave blank to retreieveall possible articles)",value=NA),
+                 textInput("retmax",label="Maximum # of articles to retrieve (leave blank to retreieveall possible articles)",value=10000),
                  checkboxInput("dateRange","Specify Date Range?",value=FALSE),
                  conditionalPanel("input.dateRange == true",
                                   dateRangeInput("dateRangeVal",label="Specify a Date Range for articles")
@@ -59,7 +62,7 @@ body<-dashboardBody(
         ),
         column(6,
                h4("Analysis Saving Options"),
-               em("Save Analysis?"),
+               em("Save Analaysis?"),
                switchInput(inputId = "saveAnalysis",label=NULL,onLabel = "YES",offLabel = "NO", value = TRUE,inline=TRUE,width='350px'),
                uiOutput("analysisFileName")
         )

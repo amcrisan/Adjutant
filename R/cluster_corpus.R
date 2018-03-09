@@ -13,7 +13,6 @@
 #' @examples See online useage demonstration:https://github.com/amcrisan/Adjutant#demo
 runTSNE<-function(tidyCorpus_df=NULL, ...){
   
-
   dtm<-cast_dtm(tidyCorpus_df,PMID,wordStemmed,tf_idf)
   
   #Run tsne Analysis

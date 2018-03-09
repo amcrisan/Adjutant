@@ -7,7 +7,7 @@ Description: A shiny app that search PubMed and performs an unsupervised cluster
 URL: https://github.com/amcrisan/adjutant
 BugReports: https://github.com/amcrisan/adjutant/issues
 Depends: R (>= 3.1.2)
-Imports: dplyr,
+Imports:dplyr,
         ggplot2,
         purrr,
         plyr,
@@ -23,7 +23,10 @@ Imports: dplyr,
         shiny,
         shinydashboard,
         shinyWidgets,
-        tm
+        tm,
+        ggthemes,
+        tcltk,
+        htmlwidgets (>= 1.0)
 License: MIT + file LICENSE
 LazyData: true
 Encoding: UTF-8

@@ -1,6 +1,5 @@
 library(adjutant) #!! We can do this now!!
 library(RISmed)
-library(rms)
 library(purrr)
 library(dplyr)
 library(DT)
@@ -14,9 +13,9 @@ library(stringr)
 library(tidyr)
 library(scales)
 library(jsonlite)
-library(ggthemes)
 library(wordcloud)
-
+library(ggthemes)
+library(tcltk)
 
 #additional analytic functions
 set.seed(416) #repping the 6ix! 
@@ -62,6 +61,7 @@ shinyServer(function(input, output,session) {
   
   #Storage of reactive dataset values
   values<-reactiveValues(
+    workDir = workDir,
     totalDocs = 0,
     corpus = NULL, #original document corpus 
     corpusTidy = NULL, # tidyText version of corpus
@@ -144,9 +144,9 @@ shinyServer(function(input, output,session) {
           values$fileName<-paste(analysisName,"documentCorpus",sep="_")
         }
         
-        # check if the  user entered a file name
+        # save analysis
         if(input$saveAnalysis){ 
-          savedFileName<-paste(workDir,"/storedAnalysis/", values$fileName,".RDS", sep = "")
+          savedFileName<-paste(values$workDir,"/storedAnalysis/", values$fileName,".RDS", sep = "")
           saveRDS(df,file=savedFileName)
         }
         
@@ -161,25 +161,68 @@ shinyServer(function(input, output,session) {
   # populate the dataset based upon uploading previous file
   # throw an error if the input data is not RDA
   # TO DO: BE A BIT STRICTER OF WHAT PEOPLE CAN INCLUDE
+  
+  #Update the working directory if necessary
+  observeEvent(input$chooseDir,{
+    values$workDir<-tk_choose.dir()
+  })
+  
+  
+  output$loadAnalysisUI<-renderUI({
+    if(dir.exists(paste0(values$workDir,"/storedAnalysis/"))){
+      if(!grepl("storedAnalysis",values$workDir)){
+        tmp<-paste0(values$workDir,"/storedAnalysis/")
+      }else{
+        tmp<-values$workDir
+      }
+      
+      fileChoices<-unique(sapply(list.files(tmp),function(x){strsplit(x,"_documentCorpus")[[1]][1]}))
+      
+      selectInput("prevAnalysis",
+                  label = "Choose and analysis to load",
+                  choices = c("",fileChoices),
+                  selected="",
+                  multiple = FALSE)
+    }else{
+      HTML("<strong>Please choose a directory that contains a storedAnalysis folder with Adjutant compatible files</strong>")
+    }
+  })
+  
   observeEvent(input$prevAnalysis,{
     if(!values$analysisProgress){
-      
-      if(!is.null(input$prevAnalysis)){
-        
-        df<-readRDS(input$prevAnalysis$datapath)
-        values$corpus<-df
-        values$totalDocs<-nrow(df)
-        values$analysisProgress <-TRUE
-        
-        #automatically go to the searchOverview
-        updateTabItems(session, "sidebarTabs","searchOverview")
-        
-      }
+       if(input$prevAnalysis !=""){
+         values$fileName <-input$prevAnalysis #general file names taken from existing project name
+         
+         #loading prior analysis files
+         if(file.exists(paste0(values$workDir,"/storedAnalysis/", values$fileName,"_documentCorpus_topicClusters.RDS"))){
+           df<-readRDS(paste0(values$workDir,"/storedAnalysis/", values$fileName,"_documentCorpus_topicClusters.RDS"))
+           
+           values$clusterNames <- df %>%
+             dplyr::group_by(tsneClusterNames) %>%
+             dplyr::summarise(medX = median(tsneComp1),
+                              medY = median(tsneComp2)) %>%
+             dplyr::filter(tsneClusterNames != "Noise")
+           
+         }else{
+           #now load the data object
+           df<-readRDS(paste0(values$workDir,"/storedAnalysis/", values$fileName,"_documentCorpus.RDS"))
+         }
+         
+         #updating reactive values
+         values$corpus<-df
+         values$totalDocs<-nrow(df)
+         values$analysisProgress <-TRUE
+         
+         
+         #autodetect if there are other files that can also automatically be laoded
+         if(file.exists(paste0(values$workDir,"/storedAnalysis/",values$fileName,"_documentCorpus_tidyText.RDS"))){
+           values$corpusTidy<-readRDS(paste0(values$workDir,"/storedAnalysis/",values$fileName,"_documentCorpus_tidyText.RDS"))
+         }
+         
+         updateTabItems(session, "sidebarTabs","searchOverview")
+       }
     }
-    
   })
-
-  
   
   ##########################################
   # Summaries of loaded dataset
@@ -215,21 +258,24 @@ shinyServer(function(input, output,session) {
   observeEvent(input$analyzeCorpus, {
     if(is.null(values$tsneObj)){
       
-      # convert to document corpus to tidy text format
-      withProgress(message = 'Making corpus tidy', 
-                  detail = "\n Cleaning up the text data, removing stop words, calcuting td_idf metric, removing very common words", value = 0, {
+      if(is.null(values$corpusTidy)){
+          # convert to document corpus to tidy text format
+          withProgress(message = 'Making corpus tidy', 
+                      detail = "\n Cleaning up the text data, removing stop words, calcuting td_idf metric, removing very common words", value = 0, {
+            
+          incProgress(amount = runif(1,min=0.1,max=0.4)) #doesn't do much but visually pacifying because it looks like things are happening
+                         
+            tidyCorpus_df<-tidyCorpus(values$corpus)
+            values$corpusTidy<-tidyCorpus_df
+            
+            if(input$saveAnalysis){
+              savedFileName<-paste(values$workDir,"/storedAnalysis/", values$fileName,"_tidyText.RDS", sep = "")
+              saveRDS(values$corpusTidy,file=savedFileName)
+            }
+          
+        })
+      }
         
-      incProgress(amount = runif(1,min=0.1,max=0.4)) #doesn't do much but visually pacifying because it looks like things are happening
-                     
-        tidyCorpus_df<-tidyCorpus(values$corpus)
-        values$corpusTidy<-tidyCorpus_df
-        
-        if(input$saveAnalysis){
-          savedFileName<-paste(workDir,"/storedAnalysis/", values$fileName,"_tidyText.RDS", sep = "")
-          saveRDS(values$corpusTidy,file=savedFileName)
-        }
-        
-      })
       #run tSNE the tidy corpus (note the runTSNE fuction 
       # will turn the tidy corpus into a document term matrix)
       withProgress(message = 'Dimensionality Reduction',
@@ -285,7 +331,7 @@ shinyServer(function(input, output,session) {
         })
       
       if(input$saveAnalysis){
-        savedFileName<-paste(workDir,"/storedAnalysis/", values$fileName,"_topicClusters.RDS", sep = "")
+        savedFileName<-paste(values$workDir,"/storedAnalysis/", values$fileName,"_topicClusters.RDS", sep = "")
         saveRDS(values$corpus,file=savedFileName)
       }
     }
@@ -378,7 +424,12 @@ shinyServer(function(input, output,session) {
                              medY = median(tsneComp2)) %>%
             dplyr::filter(tsneClusterNames != "Not-Clustered")
         
+          #save the analysis
           #initize redrawing the plot
+          
+          if(input$saveAnalysis){
+            saveRDS(values$corpus,paste0(values$workDir,"/storedAnalysis/", values$fileName,"_documentCorpus_topicClusters.RDS"))
+          }
           values$tsnePlot<-NULL
           remove(tmp)
           gc()
@@ -502,7 +553,7 @@ shinyServer(function(input, output,session) {
     gc()
     
     if(input$saveAnalysis){
-      savedFileName<-paste(workDir,"/storedAnalysis/", values$fileName,"_subset.RDS", sep = "")
+      savedFileName<-paste(values$workDir,"/storedAnalysis/", values$fileName,"_subset.RDS", sep = "")
       saveRDS(values$corpusSubset,file=savedFileName)
     }
       
@@ -543,7 +594,8 @@ shinyServer(function(input, output,session) {
       
       sendSweetAlert(
         session = session,
-        title = "Previous Analysis Clearered",
+        title = "Previous Analysis Cleared",
+        text = "",
         type = "success"
       )
     }
@@ -578,8 +630,12 @@ shinyServer(function(input, output,session) {
   output$analysisFileName<-renderUI({
     if(input$saveAnalysis & input$loadData !="Load Data"){
       textInput("analysisName",
-                label = "File name prefix for analysis (saved in priorRuns folder):",
+                label = "File name prefix for analysis (saved in storedAnalysis folder):",
                 value = values$fileName)
+    # }else if(!input$saveAnalysis & input$loadData == "Load Data"){
+    #   textInput("analysisName",
+    #             label = "File name prefix for revised cluster analysis (saved in priorAnalysis folder):",
+    #             value = values$fileName)
     }else{
       NULL
     }
@@ -609,14 +665,14 @@ shinyServer(function(input, output,session) {
   
   # a button that initiates the analysis of the document corpus!
   output$topicClustInitiateButton<-renderUI({
-    if(!is.null(values$corpus) & is.null(values$tsneObj)){
+    if(!is.null(values$corpus) & is.null(values$corpus$tsneClusterNames)){
       if(nrow(values$corpus)>=150){
         actionButton("analyzeCorpus",label="Inititate Topic Clustering")
       }else{
         #too few articles to properly run t-SNE
         NULL
       }
-    }else if(!is.null(values$tsneObj)){
+    }else if(!is.null(values$corpus$tsneClusterNames)){
       NULL
     }else{
       NULL
@@ -696,7 +752,7 @@ shinyServer(function(input, output,session) {
   
   #checkbox to select all clusters
   output$showAllClustNames<-renderUI({
-    if(!is.null(values$tsneObj)){
+    if(!is.null(values$corpus$tsneClusterNames)){
       fluidRow(
         p("   "), #lazy spacing fix
         actionButton("showAllClust",label="Select All Topic Clusters"),
@@ -711,7 +767,7 @@ shinyServer(function(input, output,session) {
   ### GENERATION ALL OF THE CLUSTER DETAILS AND STORING THEM AS NEED  ### 
   observe({
     #The dropbdown box
-    if(!is.null(values$tsneObj)){
+    if(!is.null(values$corpus$tsneClusterNames)){
       if(!is.null(input$clustButtonSelect)){
         values$clustInfoDetailsUI<-selectInput("clustDetails", "Choose a cluster", choices= input$clustButtonSelect, multiple=FALSE)
       }else{
@@ -731,10 +787,10 @@ shinyServer(function(input, output,session) {
   #show detailed cluster information on selections
   observe({
     clustInfo<-NULL
-    if(!is.null(values$tsneObj)){
+    if(!is.null(values$corpus$tsneClusterNames)){
       if(!is.null(input$clustDetails) & !is.null(input$clustButtonSelect)){
         #when there is a reset event
-        if(!is.null(values$tsneObj)){
+        if(!is.null(values$corpus$tsneClusterNames)){
           #generate the summaries that will fill up the lovely topic box
           clustSum<-clusterSummaryText(values$corpus,input$clustDetails)
           clustTerms<-topClustTerms(values$corpus,values$corpusTidy,input$clustDetails)
@@ -773,7 +829,7 @@ shinyServer(function(input, output,session) {
   output$clusterDetailsNote<-renderUI({
     
     preamble<-NULL
-    if(!is.null(values$tsneObj) & !is.null(input$clustDetails)){
+    if(!is.null(values$clusterNames) & !is.null(input$clustDetails)){
     preamble<-HTML("If you've selected more than one cluster (topic) use the dropdown box below, or you can double click on the plot above, to get more details about a specific cluster <hr>")
     }
     preamble
@@ -805,7 +861,7 @@ shinyServer(function(input, output,session) {
     if(input$sampChoices=="randomStratified"){
       choices<-c("Journal","Publication Year")
       
-      if(!is.null(values$tsneObj)){
+      if(!is.null(values$corpus$tsneClusterNames)){
         choices<-c(choices,"Topic")
       }
       
@@ -977,7 +1033,8 @@ shinyServer(function(input, output,session) {
   
   #Filter widget: filter by minimum number of citations
   output$filtTopic<-renderUI({
-    if(!is.null(values$tsneObj)){
+    if(!is.null(values$clusterNames)){
+      browser()
       clusterN<-values$corpus %>%
         ungroup()%>% #just in case
         group_by(tsneClusterNames) %>%
@@ -1315,7 +1372,7 @@ shinyServer(function(input, output,session) {
   observe({
     detPlot<-NULL
     
-    if(!is.null(values$tsneObj) & !is.null(input$clustDetails) & !is.null(input$clustButtonSelect)){
+    if(!is.null(values$corpus$tsneClusterNames) & !is.null(input$clustDetails) & !is.null(input$clustButtonSelect)){
       detPlot<-values$corpus %>%
         filter(tsneClusterNames == input$clustDetails) %>%
         ungroup()%>%
@@ -1393,7 +1450,7 @@ shinyServer(function(input, output,session) {
   output$clustTopicBoxInfo<-renderUI({
     info<-NULL
     
-    if(!is.null(values$tsneObj)){
+    if(!is.null(values$corpus$tsneClusterNames)){
      info<- HTML("<em>Topic clusters (and their total number of members) are listed below. You can click on a cluster topic button to see where the cluster is on the t-SNE plot and to get more details about that cluster. You can also double click on the t-SNE plot to bring up specific information pertaining to a cluster.<em>")
     } 
     
