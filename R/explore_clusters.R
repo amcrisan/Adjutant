@@ -1,5 +1,7 @@
-#find the largest cluster that is near where a participant is double clicking on
+#' Nearest clicked cluster
+#' @export
 clickedClusterSum<-function(corpus =NULL, e = NULL){
+  
   if(!is.null(e)){
     selPts<-nearPoints(corpus, e, threshold=10,xvar = "tsneComp1", yvar = "tsneComp2")
     
@@ -21,8 +23,10 @@ clickedClusterSum<-function(corpus =NULL, e = NULL){
 }
 
 
-#Print a summary of cluster text
+#' Print a summary statement for topic clusters
+#' @export
 clusterSummaryText<-function(corpus = NULL,clustSelected=NULL){
+  
   tmp <- corpus %>%
     filter(tsneClusterNames == clustSelected)
   
@@ -34,8 +38,10 @@ clusterSummaryText<-function(corpus = NULL,clustSelected=NULL){
 }
 
 
-#get some highly cited (by PMC internal count) papers from a cluster
+#' Top Papers for a cluster
+#' @export
 getTopPapers<-function(corpus=NULL,selectedCluster=NULL){
+  
   
   topPapers<-""
   topRef<-corpus %>%
@@ -109,7 +115,10 @@ getTopTerms<-function(clustPMID=NULL,topNVal=1,clustValue = NA,tidyCorpus = NULL
 }
 
 #top terms in each cluster
+#' Get Top Terms in Each Cluster
+#' @export
 topClustTerms<-function(corpus = NULL,corpusTidy=NULL,selectedCluster = NULL){
+  
 
   pmids<-corpus %>% filter(tsneClusterNames == selectedCluster)%>% select(PMID)
     
