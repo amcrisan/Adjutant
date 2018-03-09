@@ -1034,7 +1034,6 @@ shinyServer(function(input, output,session) {
   #Filter widget: filter by minimum number of citations
   output$filtTopic<-renderUI({
     if(!is.null(values$clusterNames)){
-      browser()
       clusterN<-values$corpus %>%
         ungroup()%>% #just in case
         group_by(tsneClusterNames) %>%
