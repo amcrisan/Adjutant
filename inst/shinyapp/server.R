@@ -19,11 +19,6 @@ library(wordcloud)
 
 
 #additional analytic functions
-# source("../../R/process_pubmed.R")
-# source("../../R/tidy_corpus.R")
-# source("../../R/cluster_corpus.R")
-# source("../../R/explore_clusters.R")
-
 set.seed(416) #repping the 6ix! 
 
 #Query Strings used for testing testing - I use a couple of example here
@@ -51,16 +46,14 @@ updatecheckboxGroupButtons_Custom <- function (session, inputId, value = NULL) {
 
 #checking if the storedAnalysis folder exists, and create one if it does not
 #this allows the analysis to be saved along the way
-currDir<-getwd()
-currDir<-gsub("/shinyapp","",currDir) %>% gsub("/inst","",.)
 
-if(!dir.exists(paste0(currDir,"/storedAnalysis/"))){
-  dir.create(file.path(currDir, "/storedAnalysis/"))
+if(!dir.exists(paste0(workDir,"/storedAnalysis/"))){
+  dir.create(file.path(workDir, "/storedAnalysis/"))
 }
 
 ## START THE SHOW
 shinyServer(function(input, output,session) {
-
+  
   session$onSessionEnded(stopApp) #kill the app when the browser is closed
   
   #------------------------------------------------------------------------------------
@@ -153,8 +146,7 @@ shinyServer(function(input, output,session) {
         
         # check if the  user entered a file name
         if(input$saveAnalysis){ 
-          browser()
-          savedFileName<-paste(currDir,"/storedAnalysis/", values$fileName,".RDS", sep = "")
+          savedFileName<-paste(workDir,"/storedAnalysis/", values$fileName,".RDS", sep = "")
           saveRDS(df,file=savedFileName)
         }
         
@@ -183,27 +175,10 @@ shinyServer(function(input, output,session) {
         updateTabItems(session, "sidebarTabs","searchOverview")
         
       }
-      
     }
     
   })
-  
-  #load a warning if the user wants to search/load something else but already has an analysis in progress
-  observeEvent(input$sidebarTabs,{
-    if(input$sidebarTabs == "searchIn"){
-      if(values$analysisProgress){
-        sendSweetAlert(
-          session = session, 
-          title = "Please Clear Analysis First!", 
-          text = "Please clear the current analysis (see option in sidebar panel)  before entering a new search term or loading a previous analysis (don't worry, all data from you current analysis is automatically saved in the 'storedAnalysis' folder", 
-          type = "error"
-        )
-        
-        #automatically go to the searchOverview
-        updateTabItems(session, "sidebarTabs","searchOverview")
-      }
-    }
-  })
+
   
   
   ##########################################
@@ -215,7 +190,6 @@ shinyServer(function(input, output,session) {
   
   # A data table containing the document corpus
   output$documentTable <- DT::renderDataTable({
-    
     if(!is.null(values$corpus)){
       #values$corpus %>%
       #  select(-contains("tsneClusterNames"), -contains("Abstract"))
@@ -239,7 +213,6 @@ shinyServer(function(input, output,session) {
   
   # Once the analysis button is clicked, autmatically go to that tab
   observeEvent(input$analyzeCorpus, {
-    
     if(is.null(values$tsneObj)){
       
       # convert to document corpus to tidy text format
@@ -252,7 +225,7 @@ shinyServer(function(input, output,session) {
         values$corpusTidy<-tidyCorpus_df
         
         if(input$saveAnalysis){
-          savedFileName<-paste("./storedAnalysis/", values$fileName,"_tidyText.RDS", sep = "")
+          savedFileName<-paste(workDir,"/storedAnalysis/", values$fileName,"_tidyText.RDS", sep = "")
           saveRDS(values$corpusTidy,file=savedFileName)
         }
         
@@ -308,13 +281,15 @@ shinyServer(function(input, output,session) {
           dplyr::group_by(tsneClusterNames) %>%
           dplyr::summarise(medX = median(tsneComp1),
                            medY = median(tsneComp2)) %>%
-          dplyr::filter(tsneClusterNames != "Noise")
+          dplyr::filter(tsneClusterNames != "Not-Clustered")
         })
+      
       if(input$saveAnalysis){
-        savedFileName<-paste("./storedAnalysis/", values$fileName,"_topicClusters.RDS", sep = "")
+        savedFileName<-paste(workDir,"/storedAnalysis/", values$fileName,"_topicClusters.RDS", sep = "")
         saveRDS(values$corpus,file=savedFileName)
       }
     }
+    
   })
   
 
@@ -327,8 +302,7 @@ shinyServer(function(input, output,session) {
         text = "The demo version of Adjutant limits the number of times a corpus can be reanalyzed ",
         type = "error"
       )
-    }
-    if(input$tsnePerplexity!=values$tsnePer | input$tsneTheta!=values$tsneTheta){
+    }else if(input$tsnePerplexity!=values$tsnePer | input$tsneTheta!=values$tsneTheta){
       paramOK<-TRUE
       
       #resetting the global parameters
@@ -402,8 +376,8 @@ shinyServer(function(input, output,session) {
             dplyr::group_by(tsneClusterNames) %>%
             dplyr::summarise(medX = median(tsneComp1),
                              medY = median(tsneComp2)) %>%
-            dplyr::filter(tsneClusterNames != "Noise")
-         
+            dplyr::filter(tsneClusterNames != "Not-Clustered")
+        
           #initize redrawing the plot
           values$tsnePlot<-NULL
           remove(tmp)
@@ -421,12 +395,11 @@ shinyServer(function(input, output,session) {
       clickedClust<-clickedClusterSum(values$corpus,input$plot_dbclick)
       
       if(!is.null(clickedClust$tsneClusterNames)){
-        if(clickedClust$tsneClusterNames != "Noise" & clickedClust$tsneClusterNames %in% input$clustButtonSelect){
+        if(clickedClust$tsneClusterNames != "Not-Clustered" & clickedClust$tsneClusterNames %in% input$clustButtonSelect){
           
           #update only if actual cluster is clicked on
           if(!is.null(input$clustDetails)){
             #make sure that whatever you clicked in is available as a choice..
-            
             updateSelectInput(session,"clustDetails",selected = clickedClust$tsneClusterNames)
           }
         }
@@ -464,7 +437,6 @@ shinyServer(function(input, output,session) {
     #Generating sample weights if weighted sampling is selected
     if(input$sampleWeight== "citation"){
       #calculate weights by citation #
-      browser()
       maxCite<-max(as.numeric(datSub$pmcCitationCount)+1,na.rm=TRUE) #add 1 so that none f the sampling proabilities are zero
         datSub<-datSub %>%
             mutate(sampWeight = (as.numeric(pmcCitationCount)+1)/maxCite) 
@@ -530,17 +502,27 @@ shinyServer(function(input, output,session) {
     gc()
     
     if(input$saveAnalysis){
-      savedFileName<-paste("./storedAnalysis/", values$fileName,"_subset.RDS", sep = "")
+      savedFileName<-paste(workDir,"/storedAnalysis/", values$fileName,"_subset.RDS", sep = "")
       saveRDS(values$corpusSubset,file=savedFileName)
     }
       
   })
   
   #------------------------------------------------------------------------------------
-  # REACTIVE EVENTS TO CLEAR THE PRESENT ANALYSIS 
+  # REACTIVE EVENTS FOR CLEARING THE PRESENT ANALYSIS  (WARNING & ACTION)
   #------------------------------------------------------------------------------------
   observeEvent(input$sidebarTabs,{
-    if(input$sidebarTabs == "clearAnalysis"){
+    if(input$sidebarTabs == "searchIn" & values$analysisProgress){
+      sendSweetAlert(
+        session = session, 
+        title = "Please Clear Analysis First!", 
+        text = "Please clear the current analysis (see option in sidebar panel)  before entering a new search term or loading a previous analysis (don't worry, all data from you current analysis is automatically saved in the 'storedAnalysis' folder", 
+            type = "error"
+          )
+          
+        #automatically go to the searchOverview
+        updateTabItems(session, "sidebarTabs","searchOverview")
+      }else if(input$sidebarTabs == "clearAnalysis"){
       
       values$totalDocs <- 0
       values$corpus <- NULL #original document corpus
@@ -558,6 +540,12 @@ shinyServer(function(input, output,session) {
       updateSearchInput(session,"searchQuery",value = "")
       
       updatecheckboxGroupButtons_Custom(session,"searchQuery",NULL)
+      
+      sendSweetAlert(
+        session = session,
+        title = "Previous Analysis Clearered",
+        type = "success"
+      )
     }
     
   })
@@ -570,10 +558,12 @@ shinyServer(function(input, output,session) {
   # SIDE BAR UI ELEMENTS
   #######################
   # menu item that displays the number of documents in the corpus
-  output$searchMenu<-renderMenu({
-    badgeLabel<-ifelse(is.null(values$corpus),"0",toString(nrow(values$corpus)))
-    menuItem("Search Results", tabName = "searchOverview", icon = icon("book"),badgeLabel = badgeLabel)
-  })
+  # commented out, it's over eager and updates all the time causing problems
+  
+ # output$searchMenu<-renderMenu({
+#    badgeLabel<-ifelse(is.null(values$corpus),"0",toString(nrow(values$corpus)))
+#    menuItem("Search Results", tabName = "searchOverview", icon = icon("book"),badgeLabel = badgeLabel)
+#  })
   
   #######################
   # SEARCH INPUT UI ELEMENTS
@@ -602,7 +592,6 @@ shinyServer(function(input, output,session) {
   
   #output some summary text of how many articles there are in a document
   output$summaryText<-renderUI({
-    
     if(!is.null(values$corpus)){
       tmp<-values$corpus$Journal %>% unique() %>% length()
        
@@ -639,7 +628,7 @@ shinyServer(function(input, output,session) {
   output$clusterOverviewStatement<-renderUI({
     if(!is.null(values$tsneObj)){
       totalDoc<-nrow(values$corpus)
-      totalClust<-values$corpus %>% filter(tsneClusterNames !="Noise") %>% count()
+      totalClust<-values$corpus %>% filter(tsneClusterNames !="Not-Clustered") %>% count()
       perClust<-paste0(round((totalClust/totalDoc)*100,1),"%")
       
       nClust<-length(unique(values$corpus$tsneClusterNames))-1
@@ -659,7 +648,6 @@ shinyServer(function(input, output,session) {
   # Define UI for the little cog wheel by the t-SNE plot
   # It will depend on the optimal parameters
   output$plotOptions<-renderUI({
-    
     if(!is.null(values$corpus$tsneClusterNames)){
       dropdownButton(
         tags$h3("Change t-SNE parameters"),
@@ -683,7 +671,7 @@ shinyServer(function(input, output,session) {
     if(!is.null(values$corpus$tsneClusterNames)){
       #get clustername and size
       clustName<-values$corpus %>%
-        filter(tsneClusterNames !="Noise") %>%
+        filter(tsneClusterNames !="Not-Clustered") %>%
         group_by(tsneClusterNames) %>%
         count()%>%
         arrange(-n) %>%
@@ -783,6 +771,7 @@ shinyServer(function(input, output,session) {
   
   # Summary text
   output$clusterDetailsNote<-renderUI({
+    
     preamble<-NULL
     if(!is.null(values$tsneObj) & !is.null(input$clustDetails)){
     preamble<-HTML("If you've selected more than one cluster (topic) use the dropdown box below, or you can double click on the plot above, to get more details about a specific cluster <hr>")
@@ -996,7 +985,7 @@ shinyServer(function(input, output,session) {
         arrange(-n) %>%
         mutate(tsneClusterNamesFormatted = sprintf("%s (n=%d)",tsneClusterNames,n ))
       
-      choicesNoNoise<-filter(clusterN,tsneClusterNames !="Noise")
+      choicesNoNoise<-filter(clusterN,tsneClusterNames !="Not-Clustered")
       
       pickerInput(
         inputId = "filtTopicsChoices", 
@@ -1247,13 +1236,13 @@ shinyServer(function(input, output,session) {
       #draw hulls around the clusters
       chulls <- plyr::ddply(df, "tsneClusterNames", function(dat) dat[chull(dat$tsneComp1, dat$tsneComp2), ]) %>%
         select(tsneClusterNames,tsneComp1,tsneComp2) %>%
-        filter(tsneClusterNames != "Noise") %>%
+        filter(tsneClusterNames != "Not-Clustered") %>%
         na.omit()
  
       
       #draw the tsne plot itself
       p<-df %>%
-      mutate(isNoise = ifelse(tsneCluster==0,"Non-Clustered","Clustered"))%>% 
+      mutate(isNoise = ifelse(tsneCluster==0,"Not-Clustered","Clustered"))%>% 
       ggplot(aes(x=tsneComp1,y=tsneComp2,group=tsneClusterNames))+
         geom_point(aes(colour=isNoise,alpha=isNoise))+
         geom_polygon(data = chulls,aes(x=tsneComp1,y=tsneComp2,group=tsneClusterNames),size=2,colour="red",fill=NA)+
@@ -1275,7 +1264,6 @@ shinyServer(function(input, output,session) {
   
   #if user selects all show all labels
   observeEvent(input$showAllClust,{
-    print("I am here")
     #updatecheckboxGroupButtons(session,"clustButtonSelect",selected=values$clusterNames$tsneClusterNames)
     
     # I have to do this step too because updatecheckboxGroupButton has some quirks

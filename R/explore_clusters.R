@@ -92,7 +92,7 @@ getTopTerms<-function(clustPMID=NULL,topNVal=1,clustValue = NA,tidyCorpus = NULL
   clustValue<-clustValue[1]
   
   if(clustValue == 0)
-    return("Noise")
+    return("Not-Clustered")
   
   topWord<-tidyCorpus %>%
     filter(PMID %in% clustPMID) %>%

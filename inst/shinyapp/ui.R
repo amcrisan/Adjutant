@@ -39,27 +39,29 @@ body<-dashboardBody(
               btnSearch = icon("search"), 
               btnReset = icon("remove"), 
               width = "100%"
-          ),
-          br(),
-          fluidRow(
-            column(6,
-              h4("Search Options"),
-              textInput("retmax",label="Maximum # of articles to retrieve (leave blank to retreieveall possible articles)",value=NA),
-              checkboxInput("dateRange","Specify Date Range?",value=FALSE),
-              conditionalPanel("input.dateRange == true",
-                               dateRangeInput("dateRangeVal",label="Specify a Date Range for articles")
-              )
-            ),
-            column(6,
-              h4("Analysis Saving Options"),
-              em("Save Analysis?"),
-              switchInput(inputId = "saveAnalysis",label=NULL,onLabel = "YES",offLabel = "NO", value = TRUE,inline=TRUE,width='350px'),
-              uiOutput("analysisFileName")
-            )
           )
         ),
         tabPanel("Load Data",
           fileInput("prevAnalysis", "Load a RDS file from previous run (see 'storedRuns' folder or load example)",width = "100%")
+        )
+      ),
+      br(),
+      fluidRow(
+        column(6,
+               conditionalPanel("input.loadData == 'Enter Query'",
+                 h4("Search Options"),
+                 textInput("retmax",label="Maximum # of articles to retrieve (leave blank to retreieveall possible articles)",value=NA),
+                 checkboxInput("dateRange","Specify Date Range?",value=FALSE),
+                 conditionalPanel("input.dateRange == true",
+                                  dateRangeInput("dateRangeVal",label="Specify a Date Range for articles")
+                 )
+               )
+        ),
+        column(6,
+               h4("Analysis Saving Options"),
+               em("Save Analysis?"),
+               switchInput(inputId = "saveAnalysis",label=NULL,onLabel = "YES",offLabel = "NO", value = TRUE,inline=TRUE,width='350px'),
+               uiOutput("analysisFileName")
         )
       )
     ),
@@ -217,7 +219,8 @@ sideDash<-dashboardSidebar(
   sidebarMenu(
     id = "sidebarTabs",
     menuItem("Search", tabName = "searchIn", icon = icon("search")),
-    menuItemOutput("searchMenu"),
+    menuItem("Search Results", tabName = "searchOverview", icon = icon("book")),
+    #menuItemOutput("searchMenu"),
     menuItem("Topic Discovery", tabName = "clusterAnalysis",icon = icon("spinner")),
     menuItem("Sample Articles", tabName = "docSample",icon=icon("clone")),
     br(),

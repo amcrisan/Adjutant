@@ -5,3 +5,4 @@
 *.Rporj
 
 ./inst/shinappy/storedRuns
+storedAnalysis
