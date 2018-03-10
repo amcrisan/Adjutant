@@ -26,6 +26,7 @@ Imports:dplyr,
         tm,
         ggthemes,
         tcltk,
+        xtable,
         htmlwidgets (>= 1.0)
 License: MIT + file LICENSE
 LazyData: true

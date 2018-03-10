@@ -201,7 +201,7 @@ shinyServer(function(input, output,session) {
              dplyr::group_by(tsneClusterNames) %>%
              dplyr::summarise(medX = median(tsneComp1),
                               medY = median(tsneComp2)) %>%
-             dplyr::filter(tsneClusterNames != "Noise")
+             dplyr::filter(tsneClusterNames != "Not-Clustered")
            
          }else{
            #now load the data object
@@ -983,7 +983,7 @@ shinyServer(function(input, output,session) {
         group_by(tsneClusterNames) %>%
         count() %>%
         arrange(-n) %>%
-        mutate(topicName = sprintf("%s (n=%d)",tsneClusterNames,n ))
+        mutate(topicName = sprintf("%s (n=%d)",as.character(tsneClusterNames),n ))
       
       pickerInput(
         inputId = "filtTopicChoices", 
