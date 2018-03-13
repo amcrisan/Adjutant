@@ -86,7 +86,7 @@ set.seed(416)
 
 **processSearch** is Adjutant's PubMed search function and is effectively a wrapper for [RISmed](https://cran.r-project.org/web/packages/RISmed/RISmed.pdf) that formats RISmed's output into a clean data frame, with additional PubMed metadata (PubMed central citation count, language, article type etc). You can pass RISmed's EUtilsSummary parameters to the Adjutant's **processSearch** function.
 
-Please note, that Adjutant's downstream methods *expect* and dataframe with the column names that are produced by the **processSearch** method.
+Please note that Adjutant's downstream methods *expect* a dataframe with the column names that are produced by the **processSearch** method.
 
 *Depending upon the size of the query, it can take a few minutes to download all of the data.*
 
@@ -154,7 +154,7 @@ Below is the same plot as before, but now we've got some clusters that Adjutant 
 
 **Step 5: Naming the clusters**
 
-Adjutant has a function called **getTopTerms** that will automatically name a cluster according to its the top two most commonly occuring terms. If there are ties, it will return all 
+Adjutant has a function called **getTopTerms** that will automatically name a cluster according to its the top two most commonly occuring terms. If there are ties, it will return all.
 
 ```R
 clustNames<-df %>%
