@@ -20,7 +20,7 @@ body<-dashboardBody(
       h2("Adjutant: support for systematic reviews"),
       p(HTML("<strong>Search and analyze PubMed results from R</strong><br>")),
       hr(),
-      p("Adjutant is an open-source, interactive, and R-based application to support literature mining of PubMed for the purposes of conducting systematic reviews. Given a PubMed compatible search query, Adjutant will assemble a document corpus and, using unsupervised techniques, identify clusters of documents pertaining to a specific topic. To support rapid analysis of the document corpus, we have made explicit trade-offs between speed and accuracy, which are modifiable by the user, and aim to provide a “good-enough” result to support, rather than supplemental, a researcher’s decision making. Thus, an analysis of several thousand documents takes only a few minutes to complete, from initial query to cluster assignment, and the user can explore the document corpus via a Shiny application. Adjutant saves analytic datasets as they are derived, and these datasets are structured and compatible with each other such that users can conduct further downstream analyses that Adjutant does not explicitly support. ")
+      p("Adjutant is an open-source, interactive, and R-based application to support literature mining of PubMed for the purposes of conducting systematic reviews. Given a PubMed compatible search query, Adjutant will assemble a document corpus and, using unsupervised techniques, identify clusters of documents pertaining to a specific topic. To support rapid analysis of the document corpus, we have made explicit trade-offs between speed and accuracy, which are modifiable by the user, and aim to provide a “good-enough” result to support, rather than replace, a researcher’s decision making. Thus, an analysis of several thousand documents takes only a few minutes to complete, from initial query to cluster assignment, and the user can explore the document corpus via a Shiny application. Adjutant saves analytic datasets as they are derived, and these datasets are structured and compatible with each other such that users can conduct further downstream analyses that Adjutant does not explicitly support. ")
     ),
     #-------------------
     # Search Input 
@@ -53,7 +53,7 @@ body<-dashboardBody(
         column(6,
                conditionalPanel("input.loadData == 'Enter Query'",
                  h4("Search Options"),
-                 textInput("retmax",label="Maximum # of articles to retrieve (leave blank to retreieveall possible articles)",value=10000),
+                 textInput("retmax",label="Maximum # of articles to retrieve (leave blank to retrieve all possible articles)",value=10000),
                  checkboxInput("dateRange","Specify Date Range?",value=FALSE),
                  conditionalPanel("input.dateRange == true",
                                   dateRangeInput("dateRangeVal",label="Specify a Date Range for articles")
@@ -62,7 +62,7 @@ body<-dashboardBody(
         ),
         column(6,
                h4("Analysis Saving Options"),
-               em("Save Analaysis?"),
+               em("Save Analysis?"),
                switchInput(inputId = "saveAnalysis",label=NULL,onLabel = "YES",offLabel = "NO", value = TRUE,inline=TRUE,width='350px'),
                uiOutput("analysisFileName")
         )
@@ -84,7 +84,7 @@ body<-dashboardBody(
         ),
         tabPanel("Overview Summary",
           br(),
-          em("This overview summary is intended to give you a sense of where these articles are published, what they cover (based soley on frequency of MeSH terms), and some of the most cited articles. These visualizations are best when there are multiple years of data from multiple journals."),
+          em("This overview summary is intended to give you a sense of where these articles are published, what they cover (based solely on frequency of MeSH terms), and some of the most cited articles. These visualizations are best when there are multiple years of data from multiple journals."),
           hr(),
           h4("Publications over time"),
           fluidRow(
@@ -97,7 +97,7 @@ body<-dashboardBody(
           ),
           hr(),
           h4("MeSH Terms over time"),
-          em("Medical Subject Heading (MeSH) terms are a controlled vocabulary used by the National Library of Medicine and assigned to articles within PubMed. MeSH terms are intended to give the reader a sense of what a PubMed article is about, but they can sometimes be much to general. For more specific topic suggestions consider initating a topic clustering, from the 'Topic Discovery' menu item to get some more specific and data-driven sense of topics within your documents."),
+          em("Medical Subject Heading (MeSH) terms are a controlled vocabulary used by the National Library of Medicine and assigned to articles within PubMed. MeSH terms are intended to give the reader a sense of what a PubMed article is about, but they can sometimes be much too general. For more specific topic suggestions consider initiating a topic clustering from the 'Topic Discovery' menu item to get some more specific and data-driven sense of topics within your documents."),
           br(),
           br(),
           fluidRow(
@@ -110,7 +110,7 @@ body<-dashboardBody(
           ),
           hr(),
           h4("Most Referenced Papers"),
-          em("Most reference articles according to PubMed Central internal counts, which don't match Google Scholar but are a reasonable heuristic. Top ten articles are returned, but there may be fewer if the search is limited to more recent publications that have yet to be cited."),
+          em("Most referenced articles according to PubMed Central internal counts, which don't match Google Scholar but are a reasonable heuristic. Top ten articles are returned, but there may be fewer if the search is limited to more recent publications that have yet to be cited."),
           br(),
           br(),
           fluidRow( #largely to keep consistent formatting
