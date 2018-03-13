@@ -567,7 +567,7 @@ shinyServer(function(input, output,session) {
       sendSweetAlert(
         session = session, 
         title = "Please Clear Analysis First!", 
-        text = "Please clear the current analysis (see option in sidebar panel)  before entering a new search term or loading a previous analysis (don't worry, all data from you current analysis is automatically saved in the 'storedAnalysis' folder", 
+        text = "Please clear the current analysis (see option in sidebar panel)  before entering a new search term or loading a previous analysis (don't worry, all data from you current analysis is automatically saved in the 'storedAnalysis' folder)", 
             type = "error"
           )
           
@@ -667,7 +667,7 @@ shinyServer(function(input, output,session) {
   output$topicClustInitiateButton<-renderUI({
     if(!is.null(values$corpus) & is.null(values$corpus$tsneClusterNames)){
       if(nrow(values$corpus)>=150){
-        actionButton("analyzeCorpus",label="Inititate Topic Clustering")
+        actionButton("analyzeCorpus",label="Initiate Topic Clustering")
       }else{
         #too few articles to properly run t-SNE
         NULL
@@ -774,7 +774,7 @@ shinyServer(function(input, output,session) {
         values$clustInfoDetailsUI<- HTML("To get cluster details, select some cluster(s) by <em>clicking on the topic buttons</em>.")
       }
     }else{
-      values$clustInfoDetailsUI<-HTML("Before you can see cluster details, you need clusters! Click on the 'initate topic clustering' button to get started")
+      values$clustInfoDetailsUI<-HTML("Before you can see cluster details, you need clusters! Click on the 'initiate topic clustering' button to get started")
     }
 
   })
@@ -1404,7 +1404,7 @@ shinyServer(function(input, output,session) {
   output$searchInfoStatement<-renderUI({
     HTML("<b><big>Search PubMed</big></b> <a href='#searchInfo'data-toggle='collapse'><small><em>(show search details)</small></em></a>
            <div id='searchInfo' class= 'collapse'>
-         Begin your search here by entering a valid <a href='https://www.ncbi.nlm.nih.gov/pubmed/' target='_blank'><strong>PubMed</strong></a> search string. To form more specific search strings, please consult PubMed directly and copy and paste the PubMed generated search string here. You can also <strong> load prior analyses </strong>, which are automatically stored in the 'storedAnalysis' folder everytime you use Adjutant</div>")
+         Begin your search here by entering a valid <a href='https://www.ncbi.nlm.nih.gov/pubmed/' target='_blank'><strong>PubMed</strong></a> search string. To form more specific search strings, please consult PubMed directly and copy and paste the PubMed generated search string here. You can also <strong> load prior analyses </strong>, which are automatically stored in the 'storedAnalysis' folder every time you use Adjutant</div>")
   })
   
   
