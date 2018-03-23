@@ -115,43 +115,54 @@ shinyServer(function(input, output,session) {
   
   # Observe if 'search' button is pushed to initate pubmed query
   observeEvent(input$searchQuery_search,{
-    if(!is.null(input$searchQuery_search)){
+    #search query is not null
+    if(!is.null(input$searchQuery_search) ){
       
-       withProgress(message = 'Querying Pubmed', value = 0,
-                    detail="This can take a few minutes depending upon how many articles there are. This step also looks up multiple sources of information too. For about one thousand articles it can take 2 - 3 minutes to grab all the data and format it for R.",{
-         incProgress(amount = runif(1,min=0.1,max=0.4)) #doesn't do much but visually pacifying because it looks like things are happening
-                      
-        #creating a vector list of arguements
-        searchArgs<-list(query = ifelse(is.null(input$searchQuery),NA,input$searchQuery),
-                    demoversion = values$demoVersion,
-                    retmax = ifelse(input$retmax == "",NA,as.numeric(input$retmax)), #as numeric failure defaults to NA
-                    mindate = ifelse(!input$dateRange,NA,as.character(format(input$dateRangeVal[1],"%Y/%m/%d"))),
-                    maxdate = ifelse(!input$dateRange,NA,as.character(format(input$dateRangeVal[2],"%Y/%m/%d")))
-                    )
-        #remove empty elements
-        searchArgs<-searchArgs[sapply(searchArgs,function(x){!is.na(x)})]
-        df<-do.call(processSearch,searchArgs) #search pubmed
-       })
-      
-      if(!is.null(df)){
-        values$corpus<-df #save corpus
-        values$totalDocs<-nrow(df) #save total # of documents
-        values$analysisProgress<-TRUE #indicate an analysis is now in progress
-        
-        #if an alternative analysis name is provided
-        if(input$analysisName != values$fileName){
-          analysisName<-gsub("\\s+","_",input$analysisName)
-          values$fileName<-paste(analysisName,"documentCorpus",sep="_")
-        }
-        
-        # save analysis
-        if(input$saveAnalysis){ 
-          savedFileName<-paste(values$workDir,"/storedAnalysis/", values$fileName,".RDS", sep = "")
-          saveRDS(df,file=savedFileName)
-        }
-        
-        #automatically go to the searchOverview
-        updateTabItems(session, "sidebarTabs","searchOverview")
+      #make sure that there's actually text in the search query, and not empty spaces
+      if(grepl("[a-zA-Z]+",input$searchQuery)){
+           withProgress(message = 'Querying Pubmed', value = 0,
+                        detail="This can take a few minutes depending upon how many articles there are. This step also looks up multiple sources of information too. For about one thousand articles it can take 2 - 3 minutes to grab all the data and format it for R.",{
+             incProgress(amount = runif(1,min=0.1,max=0.4)) #doesn't do much but visually pacifying because it looks like things are happening
+                          
+            #creating a vector list of arguements
+            searchArgs<-list(query = ifelse(is.null(input$searchQuery),NA,input$searchQuery),
+                        demoversion = values$demoVersion,
+                        retmax = ifelse(input$retmax == "",NA,as.numeric(input$retmax)), #as numeric failure defaults to NA
+                        mindate = ifelse(!input$dateRange,NA,as.character(format(input$dateRangeVal[1],"%Y/%m/%d"))),
+                        maxdate = ifelse(!input$dateRange,NA,as.character(format(input$dateRangeVal[2],"%Y/%m/%d")))
+                        )
+            #remove empty elements
+            searchArgs<-searchArgs[sapply(searchArgs,function(x){!is.na(x)})]
+            df<-do.call(processSearch,searchArgs) #search pubmed
+           })
+          
+          if(!is.null(df)){
+            values$corpus<-df #save corpus
+            values$totalDocs<-nrow(df) #save total # of documents
+            values$analysisProgress<-TRUE #indicate an analysis is now in progress
+            
+            #if an alternative analysis name is provided
+            if(input$analysisName != values$fileName){
+              analysisName<-gsub("\\s+","_",input$analysisName)
+              values$fileName<-paste(analysisName,"documentCorpus",sep="_")
+            }
+            
+            # save analysis
+            if(input$saveAnalysis){ 
+              savedFileName<-paste(values$workDir,"/storedAnalysis/", values$fileName,".RDS", sep = "")
+              saveRDS(df,file=savedFileName)
+            }
+            
+            #automatically go to the searchOverview
+            updateTabItems(session, "sidebarTabs","searchOverview")
+          }
+      }else{
+        sendSweetAlert(
+          session = session,
+          title = "Enter a valid search string",
+          text = "",
+          type = "error"
+        )   
       }
     }
     
@@ -1422,7 +1433,7 @@ shinyServer(function(input, output,session) {
     HTML("<b><big>Topic Clustering</big></b> <a href='#topicClustInfo'data-toggle='collapse'><small><em>(show topic clustering details)</small></em></a>
                <div id='topicClustInfo' class= 'collapse'>
                 <br>
-                <p><em><b>Unsupervised cluster analysis of the document corpus</em></b><br> Adjutant uses article titles and abstracts to identify document clusters pertaining to some topic. Given some set of documents, Adjutant creates a tidytext corpus using single terms <a href='https://www.tidytextmining.com/' target='_blank'>(see the excellent tidytext mining online book)</a>. Following some data wrangling and cleaning, which is detailed in our manuscript, Adjuntant calculates the <a href='https://www.tidytextmining.com/tfidf.html' target ='_blank'> td-idf metric </a> and generates a document term matrix (DTM) to prepare for cluster analysis. Our approach to unsupervised clustering was to use t-SNE to dimensionally reduce the data, via the <a href='https://cran.r-project.org/web/packages/Rtsne/index.html' target ='_blank'>RTsne package</a>, followed by hdbscan, from the <a href='hhttps://cran.r-project.org/web/packages/dbscan/README.html' target ='_blank'>dbscan package</a>, to cluster documents. Adjutant will automatically optimize the hbscan parameters, again detailed in our paper, based upon the t-SNE results. You can modify some of the t-SNE parameters to see how your results can change. Documents that are not part of any cluster are considered to be 'noise'. Finally clusters are assigned topics based upon the two most frequently occuring terms in each cluster. </p>
+                <p><em><b>Unsupervised cluster analysis of the document corpus</em></b><br> Adjutant uses article titles and abstracts to identify document clusters pertaining to some topic. Given some set of documents, Adjutant creates a tidytext corpus using single terms <a href='https://www.tidytextmining.com/' target='_blank'>(see the excellent tidytext mining online book)</a>. Following some data wrangling and cleaning, which is detailed in our manuscript, Adjuntant calculates the <a href='https://www.tidytextmining.com/tfidf.html' target ='_blank'> td-idf metric </a> and generates a document term matrix (DTM) to prepare for cluster analysis. Our approach to unsupervised clustering was to use t-SNE to dimensionally reduce the data, via the <a href='https://cran.r-project.org/web/packages/Rtsne/index.html' target ='_blank'>RTsne package</a>, followed by hdbscan, from the <a href='https://cran.r-project.org/web/packages/dbscan/README.html' target ='_blank'>dbscan package</a>, to cluster documents. Adjutant will automatically optimize the hbscan parameters, again detailed in our paper, based upon the t-SNE results. You can modify some of the t-SNE parameters to see how your results can change. Documents that are not part of any cluster are considered to be 'noise'. Finally clusters are assigned topics based upon the two most frequently occuring terms in each cluster. </p>
 <p><em><b>Exploring the topic clusters</em></b>
   <ul>
 <li> Topics: The topics of all the clusters that were found by the text mining analysis. You can click on the topic buttons to reveal more information about the topic clusters</li>

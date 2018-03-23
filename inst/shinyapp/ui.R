@@ -36,8 +36,9 @@ body<-dashboardBody(
               inputId = "searchQuery", 
               label = NULL, 
               placeholder = "Enter a PubMed search string here...", 
-              btnSearch = icon("search"), 
-              btnReset = icon("remove"), 
+              #btnSearch = icon("search"), 
+              btnSearch = tagList(shiny::icon("search"), "Search"),
+              btnReset = tagList(shiny::icon("remove"), "Reset"), 
               width = "100%"
           )
         ),
