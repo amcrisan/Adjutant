@@ -13,12 +13,16 @@ Adjutant is an open-source, interactive, and R-based application to support mini
 We've also provided a detailed video to you help install Adjutant and to give you a tour of its functionality : [https://vimeo.com/259442489
 ](https://vimeo.com/259442489)
 
+### Publication
+You can find a pre-print of Adjutant on biorxiv: [https://www.biorxiv.org/content/early/2018/03/27/290031](https://www.biorxiv.org/content/early/2018/03/27/290031)
+
 ### Citation
 If you use Adjutant, please cite:
 
-> Anamaria Crisan, Tamara Munzner, and Jennifer Gardy (2017)
-> Adjutant: an R-based tool to support topic discovery for systematic and literature review
-> url: https://github.com/amcrisan/Adjutant/
+> Adjutant: an R-based tool to support topic discovery for systematic and literature reviews
+> Anamaria Crisan, Tamara Munzner, Jennifer L. Gardy
+> bioRxiv 290031; doi: https://doi.org/10.1101/290031
+
 
 ## Download
 
@@ -28,9 +32,9 @@ Download the latest development code of Adjutant from GitHub using [devtools](ht
 devtools::install_github("amcrisan/Adjutant")
 ```
 
-### Download: Super new to R version 
+If you've got any download problems, or spot some bugs, please log an issue in the github repo.
 
-**Video coming soon**
+### Download: Super new to R version 
 
 #### Getting R and Install Adjutant
 Maybe you want to use Adjutant (you read about it, you saw it somewhere, you're my mom), but you don't really know what R is, so you're not sure where to start. 

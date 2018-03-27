@@ -1,0 +1,11 @@
+bibentry(bibtype = "Article",
+         title = "Adjutant: an R-based tool to support topic discovery for systematic and literature reviews",
+         author = c(person("Anamaria", "Crisan"),
+                    person("Tamara", "Munzner"),
+                    person("Jennifer", "Gardy")),
+         doi = "10.1101/290031",
+         url = "https://www.biorxiv.org/content/early/2018/03/27/290031",
+         year = 2018,
+         publisher = "Cold Spring Harbor Laboratory",
+         journal = "bioRxiv"
+)
