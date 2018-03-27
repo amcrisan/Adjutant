@@ -6,6 +6,11 @@
 \usage{
 clickedClusterSum(corpus = NULL, e = NULL)
 }
+\arguments{
+\item{corpus}{a document corpus}
+
+\item{e}{co-ordinates from mouse click}
+}
 \description{
 Nearest clicked cluster
 }

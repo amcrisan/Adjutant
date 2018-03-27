@@ -6,6 +6,13 @@
 \usage{
 topClustTerms(corpus = NULL, corpusTidy = NULL, selectedCluster = NULL)
 }
+\arguments{
+\item{corpus}{a document corpus}
+
+\item{corpusTidy}{a tidy text version of the corpus}
+
+\item{selectedCluster}{a name of a cluster}
+}
 \description{
 Get Top Terms in Each Cluster
 }

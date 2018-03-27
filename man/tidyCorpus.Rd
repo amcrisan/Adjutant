@@ -7,7 +7,7 @@
 tidyCorpus(corpus = NULL)
 }
 \arguments{
-\item{corpus}{}
+\item{corpus}{a document corpus}
 }
 \value{
 Tidy Text Corpus
@@ -16,5 +16,5 @@ Tidy Text Corpus
 Creates a tidytext corpus from the PubMed articles titles and abstracts. Adjutant generally follows the approach presented in  'Text Mining with R' (https://www.tidytextmining.com/tidytext.html).
 }
 \examples{
-see online useage demonstration:https://github.com/amcrisan/Adjutant#demo
+\dontrun{See online useage demonstration:https://github.com/amcrisan/Adjutant#demo}
 }

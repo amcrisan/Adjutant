@@ -1,33 +1,34 @@
 Package: adjutant
-Title: Adjutant - support for systematic reviews
+Title: Adjutant - support for systematic and literature reviews
 Version: 0.1.0
 Date: 2018-01-26
 Authors@R: person("Ana", "Crisan", email = "acrisan@cs.ubc.ca", role = c("aut", "cre"))
 Description: A shiny app that search PubMed and performs an unsupervised cluster analysis using the titles and abstracts of the retrieved documents.
 URL: https://github.com/amcrisan/adjutant
 BugReports: https://github.com/amcrisan/adjutant/issues
-Depends: R (>= 3.1.2)
-Imports:dplyr,
-        ggplot2,
-        purrr,
-        plyr,
-        DT,
-        tidytext,
-        Rtsne,
-        dbscan,
-        stringr,
-        tidyr,
-        scales,
-        jsonlite,
-        RISmed,
-        shiny,
-        shinydashboard,
-        shinyWidgets,
-        tm,
-        ggthemes,
-        tcltk,
-        xtable,
-        wordcloud,
+Depends: R (>= 3.3.3)
+Imports:dplyr (>= 0.7.4),
+        ggplot2 (>= 2.2.1),
+        purrr (>= 0.2.4),
+        plyr (>= 1.8.4),
+        DT (>= 0.4.5),
+        tidytext (>= 0.1.3),
+        Rtsne (>= 0.13),
+        dbscan(>= 1.1),
+        stringr (>= 1.1.5),
+        tidyr (>= 0.7.2),
+        scales(>= 0.5.0),
+        RISmed(>= 2.1.7),
+        shiny(>= 1.0.5),
+        jsonlite (>= 1.5),
+        shinydashboard (>= 0.6.1),
+        shinyWidgets (>= 0.4),
+        SnowballC (>= 0.5.1),
+        tm (>= 0.7),
+        ggthemes (>= 3.4.0),
+        tcltk (>= 3.3.3),
+        xtable (>= 1.8),
+        wordcloud (>= 2.5),
         htmlwidgets (>= 1.0)
 License: MIT + file LICENSE
 LazyData: true

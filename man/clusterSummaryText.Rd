@@ -6,6 +6,11 @@
 \usage{
 clusterSummaryText(corpus = NULL, clustSelected = NULL)
 }
+\arguments{
+\item{corpus}{a document corpus}
+
+\item{clustSelected}{name of a cluster}
+}
 \description{
 Print a summary statement for topic clusters
 }

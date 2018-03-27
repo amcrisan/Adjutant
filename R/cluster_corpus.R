@@ -10,7 +10,8 @@
 #' @return a data frame with with x,y t-SNE co-ordinates for
 #' @export
 #'
-#' @examples See online useage demonstration:https://github.com/amcrisan/Adjutant#demo
+#' @examples 
+#' \dontrun{See online useage demonstration:https://github.com/amcrisan/Adjutant#demo}
 runTSNE<-function(tidyCorpus_df=NULL, ...){
   
   dtm<-cast_dtm(tidyCorpus_df,PMID,wordStemmed,tf_idf)
@@ -48,14 +49,18 @@ runHDBSCAN<-function(corpus=NULL,...){
 #'
 #' @details A function that tries to find the best possible minimum cluster size parameter (minPts) for HBSCAN. This method relies on the inputs from the runTSNE method. The appraoch of this method aims for a "good enough" classifcation rather than a globally optimized solution. The defintion of "good enough" for this function is the minimum number of clusters that best explain the data. To do this, the function first derives clusters  using the hdbscan algorithm (from the dbscan package) for minPts values to be tested.  The method then identifies the optimal minPts parameters by leveraging goodness-of-fit measurements derived from linear models, specifically the adjusted R^2 and the Bayesian Information Criteria (BIC); thus each minPts parameter value tested will have an associated R^2 and BIC measure. Adjutant makes this calculation by fitting separate linear models to each of the two t-SNE dimensions, where for each linear model the t-SNE component co-ordinates are used as the dependent variable and the clusters are used as the independent variables. Each cluster is a vector of membership probabilities, from 0 (not in the cluster) to 1 (definitely a cluster member). The adjusted R^2 between the two component models are multiplied, and the BICs are averaged. To choose the optimal minPts parameters, the method than identifies all minPts values with an adjusted R^$ within 0.05 of the best performing minPts value, and among those different options selects the minPts value with the lowest BIC.
 #' 
-#' @param corpus the optimial cluster classification for each article
+#' @param corpus a document corpus
+#' @param minPtsVal single term or vector of minPts parameter values to test
 #'
 #' @import dbscan
 #' @import dplyr
+#' @importFrom stats BIC as.formula dist lm median
+#' @importFrom graphics text
 #' @return data frame of clusters for each PMID
 #' @export
 #'
-#' @examples see online useage demonstration:https://github.com/amcrisan/Adjutant#demo
+#' @examples
+#' \dontrun{See online useage demonstration:https://github.com/amcrisan/Adjutant#demo}
 optimalParam<-function(corpus=NULLL,minPtsVal = NULL){
 
   if(is.null(minPtsVal)){

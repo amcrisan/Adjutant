@@ -1,3 +1,8 @@
+#' Command to run Adjutant
+#'
+#' @details run adjutant shiny application from within adjutant package
+#'
+#' @import shiny
 #' @export
 runAdjutant <- function() {
   appDir <- system.file("shinyapp", package = "adjutant")

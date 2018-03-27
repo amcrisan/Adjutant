@@ -6,6 +6,11 @@
 \usage{
 getTopPapers(corpus = NULL, selectedCluster = NULL)
 }
+\arguments{
+\item{corpus}{a document corpus}
+
+\item{selectedCluster}{a name of cluster}
+}
 \description{
 Top Papers for a cluster
 }

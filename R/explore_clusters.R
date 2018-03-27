@@ -1,5 +1,7 @@
 #' Nearest clicked cluster
 #' @export
+#' @param corpus a document corpus
+#' @param e co-ordinates from mouse click
 clickedClusterSum<-function(corpus =NULL, e = NULL){
   
   if(!is.null(e)){
@@ -25,6 +27,8 @@ clickedClusterSum<-function(corpus =NULL, e = NULL){
 
 #' Print a summary statement for topic clusters
 #' @export
+#' @param corpus a document corpus
+#' @param clustSelected name of a cluster
 clusterSummaryText<-function(corpus = NULL,clustSelected=NULL){
   
   tmp <- corpus %>%
@@ -40,6 +44,8 @@ clusterSummaryText<-function(corpus = NULL,clustSelected=NULL){
 
 #' Top Papers for a cluster
 #' @export
+#' @param corpus a document corpus
+#' @param selectedCluster a name of cluster
 getTopPapers<-function(corpus=NULL,selectedCluster=NULL){
   
   
@@ -83,16 +89,17 @@ getTopPapers<-function(corpus=NULL,selectedCluster=NULL){
 
 #' Naming clusters
 #'
-#' @param clustPMID 
-#' @param topNVal 
-#' @param clustValue 
-#' @param tidyCorpus 
+#' @param clustPMID  PMID values for documents within the cluster
+#' @param topNVal # of top terms used to name cluster
+#' @param clustValue cluster identified, mainly used to check it unclustered 
+#' @param tidyCorpus tidytext document corpus
 #'
 #' @import dplyr
 #' @return topWord : a string of top two terms for a given cluster
 #' @export
 #'
-#' @examples See online useage demonstration:https://github.com/amcrisan/Adjutant#demo
+#' @examples 
+#' \dontrun{See online useage demonstration:https://github.com/amcrisan/Adjutant#demo}
 getTopTerms<-function(clustPMID=NULL,topNVal=1,clustValue = NA,tidyCorpus = NULL){
   
   clustValue<-clustValue[1]
@@ -117,6 +124,9 @@ getTopTerms<-function(clustPMID=NULL,topNVal=1,clustValue = NA,tidyCorpus = NULL
 #top terms in each cluster
 #' Get Top Terms in Each Cluster
 #' @export
+#' @param corpus a document corpus
+#' @param corpusTidy a tidy text version of the corpus
+#' @param selectedCluster a name of a cluster
 topClustTerms<-function(corpus = NULL,corpusTidy=NULL,selectedCluster = NULL){
   
 

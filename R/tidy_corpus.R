@@ -1,19 +1,21 @@
 #' Tidying Up the PubMed Corpus
 #'
 #' @description Creates a tidytext corpus from the PubMed articles titles and abstracts. Adjutant generally follows the approach presented in  'Text Mining with R' (https://www.tidytextmining.com/tidytext.html). 
-#' @param corpus 
+#' @param corpus a document corpus
 #'
 #' @return Tidy Text Corpus
 #' @import tidytext
 #' @import tm
 #' @import dplyr
 #' @import SnowballC
+#' @importFrom utils data tail
 #' 
 #' @export
 #'
-#' @examples see online useage demonstration:https://github.com/amcrisan/Adjutant#demo
+#' @examples 
+#' \dontrun{See online useage demonstration:https://github.com/amcrisan/Adjutant#demo}
 tidyCorpus<- function(corpus=NULL){
-  data(stop_words)
+  data(stop_words,envir = environment())
   #remove some common terms that will occur in abstract
   customStopTerms<-data.frame(word=c("abstract", "text", "abstracttext","introduction","background","method","methods","methodology","conclusion","conclusions","objectives","results","result","we","materials","purpose","significance","significant","mg","http","com"))
   

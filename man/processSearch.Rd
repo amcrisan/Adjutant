@@ -20,5 +20,5 @@ corpus
 Wrapper interface for RISmed and adding additional article metadata.
 }
 \examples{
-See online useage demonstration:https://github.com/amcrisan/Adjutant#demo
+\dontrun{See online useage demonstration:https://github.com/amcrisan/Adjutant#demo}
 }

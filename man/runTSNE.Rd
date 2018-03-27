@@ -21,5 +21,5 @@ Wrapped for rTSNE
 A wrapper for the t-SNE method that creates a document term matrix from a tidy corpus, run t-SNE, and provides a cleaned up data frame output for further analysis.
 }
 \examples{
-See online useage demonstration:https://github.com/amcrisan/Adjutant#demo
+\dontrun{See online useage demonstration:https://github.com/amcrisan/Adjutant#demo}
 }

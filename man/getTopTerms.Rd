@@ -8,13 +8,13 @@ getTopTerms(clustPMID = NULL, topNVal = 1, clustValue = NA,
   tidyCorpus = NULL)
 }
 \arguments{
-\item{clustPMID}{}
+\item{clustPMID}{PMID values for documents within the cluster}
 
-\item{topNVal}{}
+\item{topNVal}{# of top terms used to name cluster}
 
-\item{clustValue}{}
+\item{clustValue}{cluster identified, mainly used to check it unclustered}
 
-\item{tidyCorpus}{}
+\item{tidyCorpus}{tidytext document corpus}
 }
 \value{
 topWord : a string of top two terms for a given cluster
@@ -23,5 +23,5 @@ topWord : a string of top two terms for a given cluster
 Naming clusters
 }
 \examples{
-See online useage demonstration:https://github.com/amcrisan/Adjutant#demo
+\dontrun{See online useage demonstration:https://github.com/amcrisan/Adjutant#demo}
 }

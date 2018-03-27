@@ -7,10 +7,11 @@
 #'
 #' @return corpus 
 #'
-#' @examples See online useage demonstration:https://github.com/amcrisan/Adjutant#demo
+#' @examples 
+#' \dontrun{See online useage demonstration:https://github.com/amcrisan/Adjutant#demo}
 #' @import RISmed
 #' @import dplyr
-#' @import jsonlite
+#' @importFrom jsonlite fromJSON
 #' @import stringr
 #' @export
 processSearch<-function(query=NULL,demoversion=FALSE, ...){
