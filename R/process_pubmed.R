@@ -19,13 +19,33 @@ processSearch<-function(query=NULL,demoversion=FALSE, ...){
   addedParam<- list(...)
   
   #Running Query on Pubmed - kinda just gets me PMIDS
-  resQ1 <- EUtilsSummary(query=query, type='esearch', db='pubmed', ...)
+  #resQ1<-EUtilsSummary(query=query, type='esearch', db='pubmed', ...)
+  resQ1 <- tryCatch({EUtilsSummary(query=query, type='esearch', db='pubmed', ...)},
+                    error = function(err){
+                      print("Could not connect to PubMed")
+                      return(NULL)
+                    },
+                    warning = function(war){
+                      print("Could not connect to PubMed")
+                      return(NULL)})
+  
+  if(is.null(resQ1)){return(NULL)}
+            
   
   # return all queries, or if it's the demo version, only return the first 1000
   if(!demoversion){
     #if no retmax is specified, than, run this query to get more than 1000 PMIDS
     if(is.null(addedParam[['retmax']])){
-      resQ1 <- EUtilsSummary(query, type='esearch', db='pubmed',retmax=resQ1@count, ...)
+      #resQ1 <- EUtilsSummary(query, type='esearch', db='pubmed',retmax=resQ1@count, ...)
+      resQ1 <- tryCatch({EUtilsSummary(query=query, type='esearch', db='pubmed',retmax=resQ1@count,...)},
+                        error = function(err){
+                          print("Could not connect to PubMed")
+                          return(NULL)
+                        },
+                        warning = function(war){
+                          print("Could not connect to PubMed")
+                          return(NULL)})
+      
     }
   }
   
@@ -42,6 +62,7 @@ processSearch<-function(query=NULL,demoversion=FALSE, ...){
   for(i in 1:(length(numVals)-1)){
     start = numVals[i]+1
     end = numVals[i + 1]
+  
     corpus <- rbind(corpus,formatData(pmidUnique[start:end]))
   }
   
@@ -141,7 +162,19 @@ formatData<-function(ids = NULL){
     if(nrow(missingInfo)>0){
       idxdf<-match(missingInfo$PMID,allData$PMID)
       missingAbs<-sapply(missingInfo$PMID,function(x){
-        getMissingAbstract(x)
+        #some times there are connection errors
+        #use tryCatch to die a little bit more gracefully
+        #res<-getMissingAbstract(x)
+        res<-tryCatch({getMissingAbstract(x)},
+                 error = function(err){
+                   print("Could not retrieve missing abstract")
+                   return(NA)
+                   },
+                 warning = function(war){
+                   print("Could not retrieve missing abstract")
+                   return(NA)
+              })
+        res
       })
       
       allData[idxdf,]$Abstract<-missingAbs

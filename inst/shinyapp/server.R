@@ -133,7 +133,10 @@ shinyServer(function(input, output,session) {
                         )
             #remove empty elements
             searchArgs<-searchArgs[sapply(searchArgs,function(x){!is.na(x)})]
-            df<-do.call(processSearch,searchArgs) #search pubmed
+            
+
+            #search pubmed
+            df<-do.call(processSearch,searchArgs)
            })
           
           if(!is.null(df)){
@@ -155,12 +158,19 @@ shinyServer(function(input, output,session) {
             
             #automatically go to the searchOverview
             updateTabItems(session, "sidebarTabs","searchOverview")
+          }else{
+            sendSweetAlert(
+              session = session,
+              title = "Could not get PubMed results",
+              text = "Adjutant could not retrieve PubMed results. It's likely that there was  a problem with your Internet connection (including your firewall settings). Please check your internet connection and try your search again.",
+              type = "error"
+            )
           }
       }else{
         sendSweetAlert(
           session = session,
-          title = "Enter a valid search string",
-          text = "",
+          title = "Invalid search string",
+          text = "Check that you've entered a valid search string and retry your search",
           type = "error"
         )   
       }
