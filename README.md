@@ -26,7 +26,9 @@ If you use Adjutant, please cite:
 
 ### Important Adjutant Details
 
-In addition to the publication we have provided some extensive documentation on Adjutant's inner workings, from the specific R packages used in implementation, the the quality of the clustering results using both real and synthetic data. A pdf document of these details have been made [avaiable online](https://s3.amazonaws.com/adjutant/Supplemental_Materials.pdf). An R notebook is also available to download and run the analysis - due to the large size of the analysis files, the additional data and notebook is not installed with Adjutant, but can be downloaded as a tar.gz file. 
+In addition to the publication we have provided some extensive documentation on Adjutant's inner workings, from the specific R packages used in implementation, the the quality of the clustering results using both real and synthetic data. A pdf document of these details have been made [available online](https://s3.amazonaws.com/adjutant/Supplemental_Materials.pdf). 
+
+An R notebook is also available to download and run the analysis - due to the large size of the analysis files the additional data and notebook is not shipped with Adjutant, but can be [downloaded as a compressed file](https://s3.amazonaws.com/adjutant/adjutant_additional_materials.tar.gz).
 
 
 ## Download
@@ -54,7 +56,7 @@ Once you have downloaded R and R Studio, you will open RStudio in order to insta
 
 * You need to install the [devtools package](https://cran.r-project.org/web/packages/devtools/index.html).
 
-Within R or the RStudio **console**, type the following:
+Within R or the RStudio **console** window (left, bottom), type the following:
 
 ```R
 install.packages("devtools")
