@@ -98,6 +98,7 @@ To run this demo the first thing you need to do is load Adjutant (once you've do
 library(adjutant)
 library(dplyr)
 library(ggplot2)
+library(tidytext) #for stop words
 
 #also set a seed - there is some randomness in the analysis.
 set.seed(416)
