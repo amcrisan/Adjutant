@@ -12,10 +12,12 @@
 #' 
 #' @export
 #'
-#' @examples 
-#' \dontrun{See online useage demonstration:https://github.com/amcrisan/Adjutant#demo}
 tidyCorpus<- function(corpus=NULL){
-  data(stop_words,envir = environment())
+  #data(stop_words,envir = environment())
+  if (requireNamespace("tidytext", quietly = TRUE)) {
+    data(tidytext::stop_words)
+  }
+  
   #remove some common terms that will occur in abstract
   customStopTerms<-data.frame(word=c("abstract", "text", "abstracttext","introduction","background","method","methods","methodology","conclusion","conclusions","objectives","results","result","we","materials","purpose","significance","significant","mg","http","com"))
   

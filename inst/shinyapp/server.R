@@ -321,7 +321,7 @@ shinyServer(function(input, output,session) {
       #Using HDBSCAN, identify that optimal parameters for generating clusters
       withProgress(message = 'Clustering Corpus ', 
                    detail="\n Running HDBSCAN and finding optimal number of cluster", value = 0, {
-        optClusters <- optimalParam(values$corpus)
+        optClusters <- optimalParam(values$corpus)$retItems
         values$corpus<-inner_join(values$corpus,optClusters,by="PMID")
       })
       
@@ -362,6 +362,7 @@ shinyServer(function(input, output,session) {
 
   #Allowing the user to enter custom tsne parameters, and re-running the results
   observeEvent(input$reanalyze,{
+
     if(values$demoVersion & values$reanalyzeNum>1){
       sendSweetAlert(
         session = session,
@@ -412,7 +413,7 @@ shinyServer(function(input, output,session) {
           #Using HDBSCAN, identify that optimal parameters for generating clusters
           withProgress(message = 'Clustering Corpus ', 
                        detail="\n Running HDBSCAN and finding optimal number of cluster", value = 0, {
-            optClusters <- optimalParam(values$corpus)
+            optClusters <- optimalParam(values$corpus)$retItems
             tmp<-inner_join(x=values$corpus,y=optClusters,suffix=c("OLD","NEW"),by="PMID")
             
             incProgress(amount = 0.5)
@@ -455,7 +456,6 @@ shinyServer(function(input, output,session) {
           remove(tmp)
           gc()
           }
-        
     }
     
   })
@@ -567,6 +567,25 @@ shinyServer(function(input, output,session) {
           select_(groupVal, "samp") %>%
           unnest()
       }    
+    }else if(input$sampChoices == "ranked"){
+      datSub <- datSub %>%
+        filter(pmcCitationCount>0)%>%
+        top_n(input$filtSampleSizeChoice,pmcCitationCount)
+      
+    }else if(input$sampChoices == "rankedStratified"){
+      groupVal<-"Journal"
+      
+      if(input$stratifiedChoice == "Publication Year"){
+        groupVal<-"YearPub"
+      }else if(input$stratifiedChoice == "Topic"){
+        groupVal<-"tsneClusterNames"
+      }
+    
+      datSub <- datSub %>%
+        ungroup()%>%
+        filter(pmcCitationCount>0)%>% 
+        group_by_(groupVal)%>%
+        top_n(input$filtSampleSizeChoice,pmcCitationCount)
     }
     
     values$corpusSubset<-datSub
@@ -730,6 +749,7 @@ shinyServer(function(input, output,session) {
         tags$h3("Change t-SNE parameters"),
         br(),
         p("tsne parameters"),
+        HTML("<small>The perplexity parameter indicates how many other documents t-SNE should consult in the dimensionality reductio process, and the theta parameter trades off speed for accuracy (0 slower, 1 faster)</small>"),
         numericInput("tsnePerplexity",label="Set tsne perplexity parameter",value=values$tsnePer,min=5,max = nrow(values$corpus)/5),
         numericInput("tsneTheta",label="Set tsne theta parameter",value=0.5,min=0,max = 1.0),
         actionButton("reanalyze","Reanalyze"),
@@ -818,6 +838,7 @@ shinyServer(function(input, output,session) {
           clustPapers<- getTopPapers(values$corpus,input$clustDetails)
           
           clustInfo<-HTML(paste(c(clustSum,clustTerms,clustPapers)))
+          updateTabsetPanel(session=session,inputId ="exploreClust",selected="Explore Clusters")
         }
       }
     }
@@ -856,6 +877,32 @@ shinyServer(function(input, output,session) {
     preamble
   })
   
+  #brushed papers
+  output$brushedPapers<-renderUI({
+    if(!is.null(input$plot_brush)){
+      res<-brushedPoints(values$corpus,input$plot_brush)
+      
+      #summarize this all into a word thing to output
+      tmp2<-select(res ,"PMID","YearPub","Journal","Authors","Title","tsneClusterNames")
+      topPaperText<-apply(tmp2,1,function(x){
+        pmid = x[1]
+        year = x[2]
+        journal = x[3]
+        authors =  paste(strsplit(as.character(x[4]),";")[[1]][1],"<em>et.al</em>")
+        title = x[5]
+        clust = x[6]
+        
+        sprintf("[%s] %s (<strong>%s</strong>) <em>%s</em> <strong>%s</strong> PMID:<a target='_blank' href='https://www.ncbi.nlm.nih.gov/pubmed/%s'>%s</a><br><br>",clust,authors,year,title,journal,pmid,pmid)
+      })
+      
+      return(HTML(topPaperText))
+        
+      if(nrow(res) == 0)
+        return(HTML("There are no papers selected"))
+    }else{
+      return(HTML("Explore articles by brushing over data points. To initiate a brush action click on the plot, hold, and drag to create a box. You can move that box around to view articles. Single click anywhere on the plot to make the brush box ago away."))
+    }
+  })
   
   ###################################
   # SAMPLE DOCUMENTS ELEMENTS
@@ -879,7 +926,7 @@ shinyServer(function(input, output,session) {
   output$stratifiedSampleOptions<-renderUI({
     
     
-    if(input$sampChoices=="randomStratified"){
+    if(input$sampChoices=="randomStratified" | input$sampChoices=="rankedStratified"){
       choices<-c("Journal","Publication Year")
       
       if(!is.null(values$corpus$tsneClusterNames)){
@@ -900,12 +947,12 @@ shinyServer(function(input, output,session) {
 
   #Choice widget: Sampling weighting choices
   output$sampleSize<-renderUI({
-    if(input$sampChoices %in% c("random","randomStratified") & !is.null(values$corpus)){
+    if(input$sampChoices %in% c("ranked","rankedStratified","random","randomStratified") & !is.null(values$corpus)){
     
       label <- "Choose total sample size"
       value<-nrow(values$corpus)
       
-      if(input$sampChoices == "randomStratified"){
+      if(input$sampChoices == "randomStratified" || input$sampChoices == "rankedStratified"){
         label <- "Choose # of articles to sample per strata"
         value <- 1
       }
@@ -1085,26 +1132,36 @@ shinyServer(function(input, output,session) {
   #UI element : Summarize the current sample subset
   output$subsetSummary<-renderUI({
     
+    msg<-NULL
+    
     if(!is.null(values$corpusSubset)){
       subSize  <- nrow(values$corpusSubset)
       totalSize <- nrow(values$corpus)
       
+      if(nrow(values$corpusSubset) == 0 & grepl("ranked",input$sampChoices)){
+        return("No articles meet your criteria. If this is a small search with few articles that have citations you may not want to use the ranked subsetting options")
+      }
+      
+      
       msg<-sprintf("<em>Sample Summary</em><br>A total of <b>%d documents were sampled </b> out of a total possible %d documents.",subSize,totalSize)
       
-      if(input$sampChoices=="randomStratified"){
+      if(input$sampChoices=="randomStratified" || input$sampChoices=="rankedStratified" ){
         msg<-paste(msg,sprintf("Documents were sampled by <em>strata</em> according to <b>%s</b>, with <b>%d</b> documents  sampled per strata.", input$stratifiedChoice,input$filtSampleSizeChoice))
       }
       
-      if(input$sampleWeight =="citation"){
-        msg<-paste(msg,"Sampling weights were applied, giving greater weight to articles with higher PMC citation")
-      }else if(input$sampleWeight =="recency"){
-        msg<-paste(msg,"Sampling weights were applied, giving greater weight more recently published articles.")
+      if(!is.null(input$sampleWeight)){
+        if(input$sampleWeight =="citation"){
+          msg<-paste(msg,"Sampling weights were applied, giving greater weight to articles with higher PMC citation")
+        }else if(input$sampleWeight =="recency"){
+          msg<-paste(msg,"Sampling weights were applied, giving greater weight more recently published articles.")
+        }
       }
       
       return(HTML(msg))
     }else{
-      NULL
+      return(msg)
     }
+    
   })
   
   #Button widget: Apply filters
@@ -1443,7 +1500,7 @@ shinyServer(function(input, output,session) {
     HTML("<b><big>Topic Clustering</big></b> <a href='#topicClustInfo'data-toggle='collapse'><small><em>(show topic clustering details)</small></em></a>
                <div id='topicClustInfo' class= 'collapse'>
                 <br>
-                <p><em><b>Unsupervised cluster analysis of the document corpus</em></b><br> Adjutant uses article titles and abstracts to identify document clusters pertaining to some topic. Given some set of documents, Adjutant creates a tidytext corpus using single terms <a href='https://www.tidytextmining.com/' target='_blank'>(see the excellent tidytext mining online book)</a>. Following some data wrangling and cleaning, which is detailed in our manuscript, Adjuntant calculates the <a href='https://www.tidytextmining.com/tfidf.html' target ='_blank'> td-idf metric </a> and generates a document term matrix (DTM) to prepare for cluster analysis. Our approach to unsupervised clustering was to use t-SNE to dimensionally reduce the data, via the <a href='https://cran.r-project.org/web/packages/Rtsne/index.html' target ='_blank'>RTsne package</a>, followed by hdbscan, from the <a href='https://cran.r-project.org/web/packages/dbscan/README.html' target ='_blank'>dbscan package</a>, to cluster documents. Adjutant will automatically optimize the hbscan parameters, again detailed in our paper, based upon the t-SNE results. You can modify some of the t-SNE parameters to see how your results can change. Documents that are not part of any cluster are considered to be 'noise'. Finally clusters are assigned topics based upon the two most frequently occuring terms in each cluster. </p>
+                <p><em><b>Unsupervised cluster analysis of the document corpus</em></b><br> Adjutant uses article titles and abstracts to identify document clusters pertaining to some topic. Given some set of documents, Adjutant creates a tidytext corpus using single terms <a href='https://www.tidytextmining.com/' target='_blank'>(see the excellent tidytext mining online book)</a>. Following some data wrangling and cleaning, which is detailed in our manuscript, Adjuntant calculates the <a href='https://www.tidytextmining.com/tfidf.html' target ='_blank'> td-idf metric </a> and generates a document term matrix (DTM) to prepare for cluster analysis. Our approach to unsupervised clustering was to use t-SNE to dimensionally reduce the data, via the <a href='https://cran.r-project.org/web/packages/Rtsne/index.html' target ='_blank'>RTsne package</a>, followed by hdbscan, from the <a href='https://cran.r-project.org/web/packages/dbscan/README.html' target ='_blank'>dbscan package</a>, to cluster documents. Adjutant will automatically optimize the hbscan parameters, again detailed in our paper, based upon the t-SNE results. You can modify some of the t-SNE parameters to see how your results can change. Documents that are not part of any cluster are considered to be 'noise' or 'not clustered'. Finally clusters are assigned topics based upon the two most frequently occuring terms in each cluster. </p>
 <p><em><b>Exploring the topic clusters</em></b>
   <ul>
 <li> Topics: The topics of all the clusters that were found by the text mining analysis. You can click on the topic buttons to reveal more information about the topic clusters</li>

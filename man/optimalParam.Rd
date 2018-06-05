@@ -4,7 +4,7 @@
 \alias{optimalParam}
 \title{Find Optimal HDBSCAN parameters}
 \usage{
-optimalParam(corpus = NULLL, minPtsVal = NULL)
+optimalParam(corpus = NULL, minPtsVal = NULL)
 }
 \arguments{
 \item{corpus}{a document corpus}

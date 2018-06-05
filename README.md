@@ -2,6 +2,7 @@
 
 1. [Overview](#overview)
     * [Citation](#citation)
+    * [Important Adjutant Details](#important-adjutant-details)
 2. [Download](#download)
 3. [Demo](#demo)
     * [Using the Adjuntant Shiny App](#using-the-adjuntant-shiny-app)
@@ -23,6 +24,10 @@ If you use Adjutant, please cite:
 > Anamaria Crisan, Tamara Munzner, Jennifer L. Gardy
 > bioRxiv 290031; doi: https://doi.org/10.1101/290031
 
+### Important Adjutant Details
+
+In addition to the publication we have provided some extensive documentation on Adjutant's inner workings, from the specific R packages used in implementation, the the quality of the clustering results using both real and synthetic data. A pdf document of these details have been made [avaiable online](https://s3.amazonaws.com/adjutant/Supplemental_Materials.pdf). An R notebook is also available to download and run the analysis - due to the large size of the analysis files, the additional data and notebook is not installed with Adjutant, but can be downloaded as a tar.gz file. 
+
 
 ## Download
 
@@ -37,11 +42,17 @@ If you've got any download problems, or spot some bugs, please log an issue in t
 ### Download: Super new to R version 
 
 #### Getting R and Install Adjutant
-Maybe you want to use Adjutant (you read about it, you saw it somewhere, you're my mom), but you don't really know what R is, so you're not sure where to start. 
+Maybe you want to use Adjutant (you read about it, you saw it somewhere, you're my mom), but you don't really know what R is, so you're not sure where to start. Here's how to get going:
 
-First, you need to [download R](https://cloud.r-project.org/) onto your computer. You may run into trouble if you work in a place that prevents you from downloading and installing applications to your computer - this means you might need to us a home computer (but also talk to your IT team about why R is the best thing ever). You can also [download RStudio](https://www.rstudio.com/products/rstudio/download/), a useful tool for running R code and working on your own R code. You don't need RStudio to run Adjutant, but it can make things easier.
+* You need to [download R](https://cloud.r-project.org/) onto your computer
+* You need to [download RStudio](https://www.rstudio.com/products/rstudio/download/)
 
-Second, you need to install the [devtools package](https://cran.r-project.org/web/packages/devtools/index.html). You can do this by opening R (can be an icon on your desktop) or by opening RStudio.
+You may run into trouble if you work in a place that prevents you from downloading and installing applications to your computer - this means you might need to us a home computer (but also talk to your IT team about why R is the best thing ever).
+
+Once you have downloaded R and R Studio, you will open RStudio in order to install Adjutant and some additional packages. You can also view the video tutorial of how to install Adjutant here: [https://vimeo.com/259442489
+](https://vimeo.com/259442489)
+
+* You need to install the [devtools package](https://cran.r-project.org/web/packages/devtools/index.html).
 
 Within R or the RStudio **console**, type the following:
 
@@ -54,6 +65,7 @@ Now we can install Adjutant! So type the following:
 ```R
 devtools::install_github("amcrisan/Adjutant")
 ```
+
 
 ## Demo
 

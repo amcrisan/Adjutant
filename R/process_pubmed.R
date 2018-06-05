@@ -7,8 +7,6 @@
 #'
 #' @return corpus 
 #'
-#' @examples 
-#' \dontrun{See online useage demonstration:https://github.com/amcrisan/Adjutant#demo}
 #' @import RISmed
 #' @import dplyr
 #' @importFrom jsonlite fromJSON

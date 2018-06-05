@@ -98,8 +98,6 @@ getTopPapers<-function(corpus=NULL,selectedCluster=NULL){
 #' @return topWord : a string of top two terms for a given cluster
 #' @export
 #'
-#' @examples 
-#' \dontrun{See online useage demonstration:https://github.com/amcrisan/Adjutant#demo}
 getTopTerms<-function(clustPMID=NULL,topNVal=1,clustValue = NA,tidyCorpus = NULL){
   
   clustValue<-clustValue[1]

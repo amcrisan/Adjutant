@@ -10,8 +10,6 @@
 #' @return a data frame with with x,y t-SNE co-ordinates for
 #' @export
 #'
-#' @examples 
-#' \dontrun{See online useage demonstration:https://github.com/amcrisan/Adjutant#demo}
 runTSNE<-function(tidyCorpus_df=NULL, ...){
   
   dtm<-cast_dtm(tidyCorpus_df,PMID,wordStemmed,tf_idf)
@@ -59,9 +57,7 @@ runHDBSCAN<-function(corpus=NULL,...){
 #' @return data frame of clusters for each PMID
 #' @export
 #'
-#' @examples
-#' \dontrun{See online useage demonstration:https://github.com/amcrisan/Adjutant#demo}
-optimalParam<-function(corpus=NULLL,minPtsVal = NULL){
+optimalParam<-function(corpus=NULL,minPtsVal = NULL){
 
   if(is.null(minPtsVal)){
     nDocs<-nrow(corpus)
@@ -72,7 +68,7 @@ optimalParam<-function(corpus=NULLL,minPtsVal = NULL){
       minPtsVals<-c(5,minPtsVals[1:(length(minPtsVals)-2)])
     }else if(nDocs>500 & nDocs<1000){
       minPtsVals<-c(minPtsVals,500) #trying out a bunch of different values
-    }else if(nDocs > 1000){
+    }else if(nDocs >= 1000){
       minPtsVals<-c(minPtsVals,500,1000)
     }
   }
@@ -110,7 +106,7 @@ optimalParam<-function(corpus=NULLL,minPtsVal = NULL){
   retItems<-data.frame(PMID = as.character(corpus$PMID),
                        tsneCluster = optChoice$clRes$cluster)
   
-  return(retItems)
+  return(list(retItems=retItems,altChoices = optValues, altChoicesTable=clustFitScore))
   
 }
 
@@ -139,7 +135,6 @@ getOptBest<-function(optValues){
 
 #the task of searching for the optimal parameters
 runOptPotential<-function(corpus=NULL,minPt=NULL){
-  
     cl<-runHDBSCAN(corpus,minPt) 
     # usually once everything gets classified as noise there isn't 
     # much point in continuing. 
@@ -153,7 +148,7 @@ runOptPotential<-function(corpus=NULL,minPt=NULL){
                     cluster = cl$cluster,
                     clusterName = paste0("clust",cl$cluster,sep=""),
                     clustMembership= cl$membership,
-                    clustOuterlier = cl$outlier_scores,
+                    clustOutlier = cl$outlier_scores,
                     tsneComp1 = corpus$tsneComp1,
                     tsneComp2 = corpus$tsneComp2)
     
@@ -168,7 +163,8 @@ runOptPotential<-function(corpus=NULL,minPt=NULL){
     p<-ggplot(tmp,aes(x=tsneComp1,y=tsneComp2,group=cluster))+
       geom_point(alpha=0.2)+
       geom_label(data=clusterNames,aes(x=medX,y=medY,label=cluster),size=2,colour="red")+
-      stat_ellipse()+
+      stat_ellipse(aes(alpha=cluster==0))+
+      scale_alpha_manual(values=c(1,0))+
       theme_bw()
     
     #Essentially fit two linear regression model for each tsne component co-ordinates
@@ -192,7 +188,7 @@ runOptPotential<-function(corpus=NULL,minPt=NULL){
     R2<-summary(tst1)$adj.r.squared *   summary(tst2)$adj.r.squared
     
     #return the results
-    return(list(regSum=R2,fitPlot=p,BIC = BIC,minPt=minPt,fitPlot=p,clRes=cl))
+    return(list(regSum=R2,fitPlot=p,BIC = BIC,minPt=minPt,clRes=cl))
     
 }
 
@@ -202,7 +198,7 @@ getTopTerms<-function(clustPMID=NULL,topNVal=1,clustValue = NA,tidyCorpus = NULL
   clustValue<-clustValue[1]
   
   if(clustValue == 0)
-    return("Noise")
+    return("Not-Clustered")
   
   topWord<-tidyCorpus %>%
     filter(PMID %in% clustPMID) %>%

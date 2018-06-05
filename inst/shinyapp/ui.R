@@ -148,18 +148,27 @@ body<-dashboardBody(
                                    id = "clusterPlot",
                                    width="100%",
                                    uiOutput("plotOptions"),
-                                   plotOutput("tsnePlot", dblclick = "plot_dbclick")
+                                   plotOutput("tsnePlot", dblclick = "plot_dbclick",brush = "plot_brush")
                                    #uiOutput("clustTopicBoxInfo")
                                  )
         ),
         column(5, 
-               shinydashboard::box(title="Topic Cluster Details",
+               shinydashboard::tabBox(title="",
                                    id="exploreClust",
                                    width="100%",
-                                   #uiOutput("clusterDetailsNote"),
-                                   uiOutput("clusterSelect"),
-                                   uiOutput("clusterDetails"),
-                                   plotOutput("clusterDetailsGrowth",height="250px"))
+                                   tabPanel("Explore Clusters",
+                                            uiOutput("clusterSelect"),
+                                            uiOutput("clusterDetails"),
+                                            plotOutput("clusterDetailsGrowth",height="250px")
+                                   ),
+                                   tabPanel("Explore Articles",
+                                            uiOutput("brushedPapers")
+                                            )
+                                  
+              )
+                                  
+                                   
+                                  
                )   
         )
               
@@ -181,10 +190,12 @@ body<-dashboardBody(
                        selected = "random",
                        width ="100%",
                        choiceNames=c("All - select all documents meeting the filter criteria",
+                                     "Ranked - select a specific number of articles by citation count (highest cited first) that match the filter criteria",
+                                     "Ranked - select a specific number of articles by citation count (highest cited first) that match the filter criteria AND according to some strata (group)",
                                      "Random - randomly select articles that match filter criteria",
                                      "Random Stratified - randomly select articles that match the filter criteria AND according to some strata (group)"),
                        inline=FALSE,
-                       choiceValues = c("all","random","randomStratified"))
+                       choiceValues = c("all","ranked","rankedStratified","random","randomStratified"))
         ),
         column(width = 4,
           uiOutput("weightedSampleOptions"),
