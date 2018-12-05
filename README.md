@@ -22,7 +22,7 @@ If you use Adjutant, please cite:
 
 > Adjutant: an R-based tool to support topic discovery for systematic and literature reviews
 > Anamaria Crisan, Tamara Munzner, Jennifer L. Gardy
-> bioRxiv 290031; doi: https://doi.org/10.1101/290031
+> Oxford Bioinformatics; doi: 10.1093/bioinformatics/bty722
 
 ### Important Adjutant Details
 
