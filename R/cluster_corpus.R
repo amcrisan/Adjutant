@@ -396,7 +396,7 @@ optimalParamOLD<-function(corpus = NULL){
   
   tmp<-dfPts %>% 
     filter(groupingLevel == clustFitSeveralBest$groupingLevel[1]) %>%
-    mutate(veryNoisey = ifelse(PMID %in% isVeryNoisey$PMID,"Noise","Signal")) %>%
+    mutate(veryNoisey = ifelse(PMID %in% isVeryNoisey$PMID,"Not-Clustered","Signal")) %>%
     select(PMID,tsneCluster,veryNoisey)
   
   return(tmp)

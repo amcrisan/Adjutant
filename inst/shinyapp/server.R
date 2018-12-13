@@ -17,6 +17,7 @@ library(wordcloud)
 library(ggthemes)
 library(tcltk)
 
+
 #additional analytic functions
 set.seed(416) #repping the 6ix! 
 

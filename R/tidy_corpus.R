@@ -15,7 +15,7 @@
 tidyCorpus<- function(corpus=NULL){
   #data(stop_words,envir = environment())
   if (requireNamespace("tidytext", quietly = TRUE)) {
-    data(tidytext::stop_words)
+    stop_words<-tidytext::stop_words
   }
   
   #remove some common terms that will occur in abstract

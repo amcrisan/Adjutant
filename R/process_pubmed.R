@@ -12,7 +12,7 @@
 #' @importFrom jsonlite fromJSON
 #' @import stringr
 #' @export
-processSearch<-function(query=NULL,demoversion=FALSE, ...){
+processSearch<-function(query=NULL,demoversion=FALSE, forceGet = TRUE, ...){
   
   addedParam<- list(...)
   
@@ -61,7 +61,8 @@ processSearch<-function(query=NULL,demoversion=FALSE, ...){
     start = numVals[i]+1
     end = numVals[i + 1]
   
-    corpus <- rbind(corpus,formatData(pmidUnique[start:end]))
+
+    corpus <- rbind(corpus,formatData(pmidUnique[start:end],forceGet))
   }
   
   corpus<- dplyr::distinct(corpus)
@@ -72,7 +73,7 @@ processSearch<-function(query=NULL,demoversion=FALSE, ...){
 
 #formatting the pubmed data. Helper script to processSearch function
 #retrieve and format data
-formatData<-function(ids = NULL){
+formatData<-function(ids = NULL, forceGet=TRUE){
   #This here makes the queries into small manageable chucks so it doesn't time out.
   
   # TO DO: Switch from RISEmed to just parsing JSON files. Right now, esummary produces valid JSON
@@ -157,7 +158,7 @@ formatData<-function(ids = NULL){
     #find missing abstracts and add them properly do the data
     missingInfo<-filter(allData,Abstract == "")
     
-    if(nrow(missingInfo)>0){
+    if(nrow(missingInfo)>0 && forceGet){
       idxdf<-match(missingInfo$PMID,allData$PMID)
       missingAbs<-sapply(missingInfo$PMID,function(x){
         #some times there are connection errors

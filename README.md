@@ -14,9 +14,6 @@ Adjutant is an open-source, interactive, and R-based application to support mini
 We've also provided a detailed video to you help install Adjutant and to give you a tour of its functionality : [https://vimeo.com/259442489
 ](https://vimeo.com/259442489)
 
-### Publication
-You can find a pre-print of Adjutant on biorxiv: [https://www.biorxiv.org/content/early/2018/03/27/290031](https://www.biorxiv.org/content/early/2018/03/27/290031)
-
 ### Citation
 If you use Adjutant, please cite:
 
