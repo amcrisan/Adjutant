@@ -4,12 +4,17 @@
 \alias{processSearch}
 \title{Processing PubMed Search}
 \usage{
-processSearch(query = NULL, demoversion = FALSE, ...)
+processSearch(query = NULL, ncbi_key = NULL, demoversion = FALSE,
+  forceGet = TRUE, ...)
 }
 \arguments{
 \item{query}{query for PubMed search}
 
+\item{ncbi_key}{an ncbi api key}
+
 \item{demoversion}{hard limit on PubMED retrieved records to 1000. Mainly used for easy transition to demo app version of Adjutant  [Default: FALSE]}
+
+\item{forceGet}{whether to try get abstracts that having gone missing (default:TRUE)}
 
 \item{...}{arguments passed to RISmed::EUtilsSummary method}
 }
@@ -18,7 +23,4 @@ corpus
 }
 \description{
 Wrapper interface for RISmed and adding additional article metadata.
-}
-\examples{
-\dontrun{See online useage demonstration:https://github.com/amcrisan/Adjutant#demo}
 }

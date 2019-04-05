@@ -2,8 +2,9 @@
 
 1. [Overview](#overview)
     * [Citation](#citation)
-    * [Important Adjutant Details](#important-adjutant-details)
+    * [Important Adjutant Details](#adjutant-inner-workings)
 2. [Download](#download)
+    * [Getting an NCBI API Key](#ncbi-api-key)
 3. [Demo](#demo)
     * [Using the Adjuntant Shiny App](#using-the-adjuntant-shiny-app)
     * [Using Adjutant within a R script](#using-adjutant-within-a-R-script)
@@ -26,7 +27,7 @@ If you use Adjutant, please cite:
 > Anamaria Crisan, Tamara Munzner, Jennifer L. Gardy
 > Oxford Bioinformatics; doi: 10.1093/bioinformatics/bty722
 
-### Important Adjutant Details
+### Adjutant Inner Workings
 
 In addition to the publication we have provided some extensive documentation on Adjutant's inner workings, from the specific R packages used in implementation, the the quality of the clustering results using both real and synthetic data. A pdf document of these details have been made [available online](https://s3.amazonaws.com/adjutant/Supplemental_Materials.pdf). 
 
@@ -69,6 +70,15 @@ Now we can install Adjutant! So type the following:
 ```R
 devtools::install_github("amcrisan/Adjutant")
 ```
+
+### NCBI API Key
+
+NCBI is limiting the amount of requests its servers handle from a single API address, when using Adjutant this often manifests as a connection error. I've added some functionality into Adjutant that limits how often it queries Pubmed each second, but if you register for an API key you may connection issues.
+
+If it pretty straight forward to get an NCBI API key, you can follow the [online instructions](https://ncbiinsights.ncbi.nlm.nih.gov/2017/11/02/new-api-keys-for-the-e-utilities/).
+
+You can use your the NCBI API key with Adjutant when using the shiny application or when using the command line functions. Adjutant will automatically append the NCBI API key to your search. You can use Adjutant without an API key, but you might run into more connection problems.
+
 
 
 ## Demo
@@ -116,6 +126,18 @@ Please note that Adjutant's downstream methods *expect* a dataframe with the col
 
 ```R
 df<-processSearch("(outbreak OR epidemic OR pandemic) AND genom*",retmax=2000)
+```
+
+If you have an NCBI API key, you should include it within processSearch. See the 'NCBI API Key' section of this readme for more details. You can also choose not retrieve missing abstracts (which happens infrequently), which also speeds up the search process.
+
+```R
+ncbi_key<-"A_key_I_made_up"
+
+#ncbi_key is a parameter that takes your ncbi_api key value
+#forceGet is a parameter that indicates if you should try retrieve missing abstracts (default:TRUE) or not (FALSE).
+
+df<-processSearch("(outbreak OR epidemic OR pandemic) AND genom*",ncbi_key = ncbi_key, forceGet=FALSE,retmax=2000)
+
 ```
 **Step 2: Generating a tidy text corpus**
 
