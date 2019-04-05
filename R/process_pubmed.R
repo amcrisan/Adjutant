@@ -12,12 +12,18 @@
 #' @importFrom jsonlite fromJSON
 #' @import stringr
 #' @export
-processSearch<-function(query=NULL,demoversion=FALSE, forceGet = TRUE, ...){
+processSearch<-function(query=NULL,ncbi_key=NULL,demoversion=FALSE, forceGet = TRUE, ...){
   
   addedParam<- list(...)
   
   #Running Query on Pubmed - kinda just gets me PMIDS
   #resQ1<-EUtilsSummary(query=query, type='esearch', db='pubmed', ...)
+
+    if(!is.null(ncbi_key)){
+      ncbi_key<-gsub("\\s+","",ncbi_key)
+      query<-sprintf("%s&api_key=%s",gsub(" ","+",query),ncbi_key)
+    }
+  
   resQ1 <- tryCatch({EUtilsSummary(query=query, type='esearch', db='pubmed', ...)},
                     error = function(err){
                       print("Could not connect to PubMed")
@@ -62,7 +68,8 @@ processSearch<-function(query=NULL,demoversion=FALSE, forceGet = TRUE, ...){
     end = numVals[i + 1]
   
 
-    corpus <- rbind(corpus,formatData(pmidUnique[start:end],forceGet))
+    corpus <- rbind(corpus,formatData(pmidUnique[start:end],ncbi_key,forceGet))
+    Sys.sleep(1) #slow down the connection
   }
   
   corpus<- dplyr::distinct(corpus)
@@ -73,7 +80,7 @@ processSearch<-function(query=NULL,demoversion=FALSE, forceGet = TRUE, ...){
 
 #formatting the pubmed data. Helper script to processSearch function
 #retrieve and format data
-formatData<-function(ids = NULL, forceGet=TRUE){
+formatData<-function(ids = NULL, ncbi_key = NULL, forceGet=TRUE){
   #This here makes the queries into small manageable chucks so it doesn't time out.
   
   # TO DO: Switch from RISEmed to just parsing JSON files. Right now, esummary produces valid JSON
@@ -82,7 +89,14 @@ formatData<-function(ids = NULL, forceGet=TRUE){
   # part of the eUtils suite that DOESN'T yet properly return JSON. eSearch does and eSummary does.
     
     tmpids<-ids #sanity check for when results suddenly seem to get dropped
-    pubResults<-EUtilsGet(paste0(tmpids,collapse = ","),type="efetch",db="pubmed")
+  
+    if(!is.null(ncbi_key)){
+      query<-sprintf('%s&api_key=%s',paste0(tmpids,collapse = ","),ncbi_key)
+    }else{
+      query<-paste0(tmpids,collapse = ",")
+    }
+    
+    pubResults<-EUtilsGet(query,type="efetch",db="pubmed")
     
     #make sure that results out = result in. EUtils 
     #its an odd fringe case, but this does actually happen
@@ -118,7 +132,15 @@ formatData<-function(ids = NULL, forceGet=TRUE){
     # what *other pubmed articles* have referenced this work. This number *does not*
     # match what a google search provides. The number provided here relies on 
     # Pubmed Central (open access). SO it's a decent heuristic, but its not perfect
-    url<-sprintf("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=pubmed&id=%s&retmode=json",paste0(tmpids,collapse="+"))
+    if(!is.null(ncbi_key)){
+      url<-sprintf("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=pubmed&id=%s&retmode=json&api_key=%s",
+                   paste0(tmpids,collapse="+"),
+                   ncbi_key)
+    }else{
+      url<-sprintf("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=pubmed&id=%s&retmode=json",
+                   paste0(tmpids,collapse="+"))
+    }
+    
     tmp<-fromJSON(url)
     
     metadata<-sapply(tmp$result[2:length(tmp$result)],function(x){
@@ -158,13 +180,13 @@ formatData<-function(ids = NULL, forceGet=TRUE){
     #find missing abstracts and add them properly do the data
     missingInfo<-filter(allData,Abstract == "")
     
-    if(nrow(missingInfo)>0 && forceGet){
+    if(nrow(missingInfo)>0 & forceGet){
       idxdf<-match(missingInfo$PMID,allData$PMID)
       missingAbs<-sapply(missingInfo$PMID,function(x){
         #some times there are connection errors
         #use tryCatch to die a little bit more gracefully
         #res<-getMissingAbstract(x)
-        res<-tryCatch({getMissingAbstract(x)},
+        res<-tryCatch({getMissingAbstract(x,ncbi_key)},
                  error = function(err){
                    print("Could not retrieve missing abstract")
                    return(NA)
@@ -183,9 +205,14 @@ formatData<-function(ids = NULL, forceGet=TRUE){
     #adding those meshTerms
     allData$meshTerms<-meshTerms
     
-    #finally, clean up the pmcCitationCOunt
+    #finally, clean up the pmcCitationCount
+    #remove anything that didn't have a title or an abstract
     allData<-allData %>%
-      mutate(pmcCitationCount = ifelse(is.na(pmcCitationCount),0,pmcCitationCount))
+      dplyr::mutate(pmcCitationCount = ifelse(is.na(pmcCitationCount),0,pmcCitationCount)) %>%
+      dplyr::filter(!is.na(Title)) %>%
+      dplyr::filter(!is.na(Abstract))
+    
+    
     
   return(allData)
 }
@@ -249,8 +276,13 @@ processMetaJSON<-function(tmp=NULL){
 }
 
 
-getMissingAbstract<-function(PMID=NULL){
-  test<-paste(readLines(sprintf("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&id=%s",PMID)),collapse="\n")
+getMissingAbstract<-function(PMID=NULL,ncbi_key=NULL){
+  if(!is.null(ncbi_key)){
+    test<-paste(readLines(sprintf("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&id=%s&api_key=%s",PMID,ncbi_key)),collapse="\n")
+  }else{
+    test<-paste(readLines(sprintf("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&id=%s",PMID)),collapse="\n")
+  }
+ 
   test<-str_extract(test,'abstract\\s+("([^"]|"")*")') %>% gsub("abstract","",.) %>% gsub('\\"',"",.) %>% gsub("\n","",.)
   return(test)
 }

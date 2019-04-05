@@ -29,6 +29,9 @@ body<-dashboardBody(
       uiOutput("searchInfoStatement"),
       hr(class="style-four"), 
       tabsetPanel(id = "loadData", type="pills",
+        tabPanel("NCBI API",
+                 uiOutput("NCBI_key")
+                 ),
         tabPanel("Enter Query",
           br(),
           actionLink("loadExample",HTML("<small>Load an example query</small>")),
@@ -58,7 +61,8 @@ body<-dashboardBody(
                  checkboxInput("dateRange","Specify Date Range?",value=FALSE),
                  conditionalPanel("input.dateRange == true",
                                   dateRangeInput("dateRangeVal",label="Specify a Date Range for articles")
-                 )
+                 ),
+                 checkboxInput("forceGet","Attempt to get missing abstracts? (Search takes longer)",value=FALSE)
                )
         ),
         column(6,

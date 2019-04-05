@@ -62,6 +62,7 @@ shinyServer(function(input, output,session) {
   
   #Storage of reactive dataset values
   values<-reactiveValues(
+    ncbi_key=NULL,
     workDir = workDir,
     totalDocs = 0,
     corpus = NULL, #original document corpus 
@@ -127,7 +128,9 @@ shinyServer(function(input, output,session) {
                           
             #creating a vector list of arguements
             searchArgs<-list(query = ifelse(is.null(input$searchQuery),NA,input$searchQuery),
+                        ncbi_key<-values$ncbi_key,
                         demoversion = values$demoVersion,
+                        forceGet = input$forceGet, #forcing to get the abstracts
                         retmax = ifelse(input$retmax == "",NA,as.numeric(input$retmax)), #as numeric failure defaults to NA
                         mindate = ifelse(!input$dateRange,NA,as.character(format(input$dateRangeVal[1],"%Y/%m/%d"))),
                         maxdate = ifelse(!input$dateRange,NA,as.character(format(input$dateRangeVal[2],"%Y/%m/%d")))
@@ -135,7 +138,6 @@ shinyServer(function(input, output,session) {
             #remove empty elements
             searchArgs<-searchArgs[sapply(searchArgs,function(x){!is.na(x)})]
             
-
             #search pubmed
             df<-do.call(processSearch,searchArgs)
            })
@@ -326,6 +328,7 @@ shinyServer(function(input, output,session) {
         values$corpus<-inner_join(values$corpus,optClusters,by="PMID")
       })
       
+  
       #name clusters according to top-two terms appear in cluster
       withProgress(message = "Naming Clusters",
                    detail= "Data are now clustered and are being assigned names to make it easier to navigate", value = 0, {
@@ -335,6 +338,9 @@ shinyServer(function(input, output,session) {
           mutate(tsneClusterNames = getTopTerms(clustPMID = PMID,clustValue=tsneCluster,topNVal = 2,tidyCorpus=tidyCorpus_df)) %>%
           select(PMID,tsneClusterNames) %>%
           ungroup()
+        
+        #not sure why I have to to do this..
+        clustNames[clustNames$tsneClusterNames=="Noise",]$tsneClusterNames<-"Not-Clustered"
         
         #update document corpus with cluster names
         values$corpus<-inner_join(values$corpus,clustNames,by=c("PMID","tsneCluster"))
@@ -426,11 +432,15 @@ shinyServer(function(input, output,session) {
            })
           
           #re-name clusters
+         
           clustNames<-values$corpus %>%
-            group_by(tsneCluster)%>%
-            mutate(tsneClusterNames = getTopTerms(clustPMID = PMID,clustValue=tsneCluster,topNVal = 2,tidyCorpus=values$corpusTidy)) %>%
-            select(PMID,tsneClusterNames) %>%
-            ungroup()
+            dplyr::group_by(tsneCluster)%>%
+            dplyr::mutate(tsneClusterNames = getTopTerms(clustPMID = PMID,clustValue=tsneCluster,topNVal = 2,tidyCorpus=values$corpusTidy)) %>%
+            dplyr::select(PMID,tsneClusterNames) %>%
+            dplyr::ungroup()
+
+          #not sure why I have to to do this..
+          clustNames[clustNames$tsneClusterNames=="Noise",]$tsneClusterNames<-"Not-Clustered"
           
           #update document corpus with cluster names
           tmp<-inner_join(values$corpus,clustNames,by=c("PMID","tsneCluster"),suffix=c("OLD","NEW"))
@@ -661,6 +671,50 @@ shinyServer(function(input, output,session) {
   #######################
   # SEARCH INPUT UI ELEMENTS
   #######################
+  
+  # A user must enter an NCBI key otherwise, they will
+  # Have connection issues
+  
+  output$NCBI_key<-renderUI({
+    #check if a key already exists
+    key_txt<-""
+    if(file.exists("./usr_ncbi_key.txt")){
+      
+      fileConn<-file("./usr_ncbi_key.txt")
+      key_txt<-readLines(fileConn)
+      close(fileConn)
+      values$ncbi_key<-key_txt
+    }
+    
+    button_txt<-ifelse(key_txt =="","Add","Change")
+    title_txt<-ifelse(key_txt=="",
+                      "Pubmed limits search activity by IP address. We recommend you create an NCBI key in order to avoid disconnected dropouts. You can get more details on Adjutant github repo: https://github.com/amcrisan/Adjutant",
+                      "This is your NCBI API connection key, you can change it any time.")
+    
+    key_ui<-div(
+      br(),
+      p(title_txt),
+      shiny::textInput(inputId = "ncbi_key",
+                                label="NCBI API KEY:",
+                                value=key_txt),
+      actionButton(inputId = "ncbi_key_action",label=button_txt)
+  )
+    
+    return(key_ui)
+  })
+  
+  #update the NCBI key when someone adds it
+  observeEvent(input$ncbi_key_action,{
+    key_txt<-input$ncbi_key
+    values$ncbi_key<-key_txt
+    
+    #write to file, store for future
+    fileConn<-file("./usr_ncbi_key.txt")
+    writeLines(key_txt, fileConn)
+    close(fileConn)
+    
+  })
+  
   
   # If user choose to save their analysis (default option)
   # Allow user to enter their own file name. Default file name
@@ -1283,7 +1337,7 @@ shinyServer(function(input, output,session) {
              subtitle="Note that not all articles have been assigned mesh terms ",
              x="Publication Year",
              y="# of documents containing the Mesh Term") +
-        scale_colour_tableau("tableau10medium")+
+        scale_colour_tableau()+
         #scale_x_continuous(limits=c(min(values$corpus$YearPub),max(values$corpus$YearPub)))+
         theme_bw()
       

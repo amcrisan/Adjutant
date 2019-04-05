@@ -197,8 +197,9 @@ runOptPotential<-function(corpus=NULL,minPt=NULL){
 getTopTerms<-function(clustPMID=NULL,topNVal=1,clustValue = NA,tidyCorpus = NULL){
   clustValue<-clustValue[1]
   
-  if(clustValue == 0)
+  if(clustValue == 0){
     return("Not-Clustered")
+  }
   
   topWord<-tidyCorpus %>%
     filter(PMID %in% clustPMID) %>%
