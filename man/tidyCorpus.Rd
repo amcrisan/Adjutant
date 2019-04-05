@@ -15,6 +15,3 @@ Tidy Text Corpus
 \description{
 Creates a tidytext corpus from the PubMed articles titles and abstracts. Adjutant generally follows the approach presented in  'Text Mining with R' (https://www.tidytextmining.com/tidytext.html).
 }
-\examples{
-\dontrun{See online useage demonstration:https://github.com/amcrisan/Adjutant#demo}
-}

@@ -4,7 +4,8 @@
 .Ruserdata
 *.Rporj
 
-./inst/shinappy/storedRuns
-./inst/additionalMaterial
-./inst/adjutant_additional_materials.tar.gz
+inst/shinappy/storedRuns
+inst/additionalMaterial
+inst/adjutant_additional_materials.tar.gz
 storedAnalysis
+inst/shinappy/usr_ncbi_key.txt

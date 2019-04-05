@@ -98,26 +98,26 @@ getTopPapers<-function(corpus=NULL,selectedCluster=NULL){
 #' @return topWord : a string of top two terms for a given cluster
 #' @export
 #'
-getTopTerms<-function(clustPMID=NULL,topNVal=1,clustValue = NA,tidyCorpus = NULL){
-  
-  clustValue<-clustValue[1]
-  
-  if(clustValue == 0)
-    return("Not-Clustered")
-  
-  topWord<-tidyCorpus %>%
-    filter(PMID %in% clustPMID) %>%
-    ungroup() %>%
-    group_by(wordStemmed) %>%
-    dplyr::count() %>%
-    ungroup()%>%
-    arrange(-nn) %>%
-    top_n(topNVal)
-  
-  # return character and collapse top terms (useful in even of a tie)
-  topWord<-paste0(topWord$wordStemmed,collapse = "-")
-  return(topWord)
-}
+# getTopTerms<-function(clustPMID=NULL,topNVal=1,clustValue = NA,tidyCorpus = NULL){
+#   
+#   clustValue<-clustValue[1]
+#   
+#   if(clustValue == 0)
+#     return("Not-Clustered")
+#   
+#   topWord<-tidyCorpus %>%
+#     filter(PMID %in% clustPMID) %>%
+#     ungroup() %>%
+#     group_by(wordStemmed) %>%
+#     dplyr::count() %>%
+#     ungroup()%>%
+#     arrange(-nn) %>%
+#     top_n(topNVal)
+#   
+#   # return character and collapse top terms (useful in even of a tie)
+#   topWord<-paste0(topWord$wordStemmed,collapse = "-")
+#   return(topWord)
+# }
 
 #top terms in each cluster
 #' Get Top Terms in Each Cluster

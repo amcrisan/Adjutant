@@ -2,9 +2,10 @@
 % Please edit documentation in R/explore_clusters.R
 \name{topClustTerms}
 \alias{topClustTerms}
-\title{Get Top Terms in Each Cluster}
+\title{Naming clusters}
 \usage{
-topClustTerms(corpus = NULL, corpusTidy = NULL, selectedCluster = NULL)
+topClustTerms(corpus = NULL, corpusTidy = NULL,
+  selectedCluster = NULL)
 }
 \arguments{
 \item{corpus}{a document corpus}
@@ -12,7 +13,18 @@ topClustTerms(corpus = NULL, corpusTidy = NULL, selectedCluster = NULL)
 \item{corpusTidy}{a tidy text version of the corpus}
 
 \item{selectedCluster}{a name of a cluster}
+
+\item{clustPMID}{PMID values for documents within the cluster}
+
+\item{topNVal}{# of top terms used to name cluster}
+
+\item{clustValue}{cluster identified, mainly used to check it unclustered}
+
+\item{tidyCorpus}{tidytext document corpus}
+}
+\value{
+topWord : a string of top two terms for a given cluster
 }
 \description{
-Get Top Terms in Each Cluster
+Naming clusters
 }
