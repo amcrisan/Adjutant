@@ -2,7 +2,7 @@
 % Please edit documentation in R/explore_clusters.R
 \name{getTopPapers}
 \alias{getTopPapers}
-\title{Top Papers for a cluster}
+\title{getTopPapers}
 \usage{
 getTopPapers(corpus = NULL, selectedCluster = NULL)
 }

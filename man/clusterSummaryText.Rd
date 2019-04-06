@@ -2,7 +2,7 @@
 % Please edit documentation in R/explore_clusters.R
 \name{clusterSummaryText}
 \alias{clusterSummaryText}
-\title{Print a summary statement for topic clusters}
+\title{clusterSummaryText}
 \usage{
 clusterSummaryText(corpus = NULL, clustSelected = NULL)
 }

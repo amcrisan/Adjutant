@@ -62,7 +62,7 @@ shinyServer(function(input, output,session) {
   
   #Storage of reactive dataset values
   values<-reactiveValues(
-    ncbi_key=NULL,
+    ncbi_key=NA,
     workDir = workDir,
     totalDocs = 0,
     corpus = NULL, #original document corpus 
@@ -128,7 +128,7 @@ shinyServer(function(input, output,session) {
                           
             #creating a vector list of arguements
             searchArgs<-list(query = ifelse(is.null(input$searchQuery),NA,input$searchQuery),
-                        ncbi_key<-values$ncbi_key,
+                        ncbi_key = values$ncbi_key,
                         demoversion = values$demoVersion,
                         forceGet = input$forceGet, #forcing to get the abstracts
                         retmax = ifelse(input$retmax == "",NA,as.numeric(input$retmax)), #as numeric failure defaults to NA
@@ -136,6 +136,7 @@ shinyServer(function(input, output,session) {
                         maxdate = ifelse(!input$dateRange,NA,as.character(format(input$dateRangeVal[2],"%Y/%m/%d")))
                         )
             #remove empty elements
+            
             searchArgs<-searchArgs[sapply(searchArgs,function(x){!is.na(x)})]
             
             #search pubmed

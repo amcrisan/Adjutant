@@ -14,14 +14,14 @@
 #' @importFrom jsonlite fromJSON
 #' @import stringr
 #' @export
-processSearch<-function(query=NULL,ncbi_key=NULL,demoversion=FALSE, forceGet = TRUE, ...){
-  
+processSearch<-function(query=NULL,ncbi_key=NA,demoversion=FALSE, forceGet = TRUE, ...){
+
   addedParam<- list(...)
   
   #Running Query on Pubmed - kinda just gets me PMIDS
   #resQ1<-EUtilsSummary(query=query, type='esearch', db='pubmed', ...)
 
-    if(!is.null(ncbi_key)){
+    if(!is.na(ncbi_key)){
       ncbi_key<-gsub("\\s+","",ncbi_key)
       query<-sprintf("%s&api_key=%s",gsub(" ","+",query),ncbi_key)
     }
@@ -41,7 +41,7 @@ processSearch<-function(query=NULL,ncbi_key=NULL,demoversion=FALSE, forceGet = T
   # return all queries, or if it's the demo version, only return the first 1000
   if(!demoversion){
     #if no retmax is specified, than, run this query to get more than 1000 PMIDS
-    if(is.null(addedParam[['retmax']])){
+    if(is.na(addedParam[['retmax']])){
       #resQ1 <- EUtilsSummary(query, type='esearch', db='pubmed',retmax=resQ1@count, ...)
       resQ1 <- tryCatch({EUtilsSummary(query=query, type='esearch', db='pubmed',retmax=resQ1@count,...)},
                         error = function(err){
@@ -82,7 +82,7 @@ processSearch<-function(query=NULL,ncbi_key=NULL,demoversion=FALSE, forceGet = T
 
 #formatting the pubmed data. Helper script to processSearch function
 #retrieve and format data
-formatData<-function(ids = NULL, ncbi_key = NULL, forceGet=TRUE){
+formatData<-function(ids = NULL, ncbi_key = NA, forceGet=TRUE){
   #This here makes the queries into small manageable chucks so it doesn't time out.
   
   # TO DO: Switch from RISEmed to just parsing JSON files. Right now, esummary produces valid JSON
@@ -92,7 +92,7 @@ formatData<-function(ids = NULL, ncbi_key = NULL, forceGet=TRUE){
     
     tmpids<-ids #sanity check for when results suddenly seem to get dropped
   
-    if(!is.null(ncbi_key)){
+    if(!is.na(ncbi_key)){
       query<-sprintf('%s&api_key=%s',paste0(tmpids,collapse = ","),ncbi_key)
     }else{
       query<-paste0(tmpids,collapse = ",")
@@ -134,7 +134,7 @@ formatData<-function(ids = NULL, ncbi_key = NULL, forceGet=TRUE){
     # what *other pubmed articles* have referenced this work. This number *does not*
     # match what a google search provides. The number provided here relies on 
     # Pubmed Central (open access). SO it's a decent heuristic, but its not perfect
-    if(!is.null(ncbi_key)){
+    if(!is.na(ncbi_key)){
       url<-sprintf("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=pubmed&id=%s&retmode=json&api_key=%s",
                    paste0(tmpids,collapse="+"),
                    ncbi_key)
@@ -278,8 +278,8 @@ processMetaJSON<-function(tmp=NULL){
 }
 
 
-getMissingAbstract<-function(PMID=NULL,ncbi_key=NULL){
-  if(!is.null(ncbi_key)){
+getMissingAbstract<-function(PMID=NULL,ncbi_key=NA){
+  if(!is.na(ncbi_key)){
     test<-paste(readLines(sprintf("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&id=%s&api_key=%s",PMID,ncbi_key)),collapse="\n")
   }else{
     test<-paste(readLines(sprintf("https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&id=%s",PMID)),collapse="\n")
