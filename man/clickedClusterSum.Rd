@@ -2,7 +2,7 @@
 % Please edit documentation in R/explore_clusters.R
 \name{clickedClusterSum}
 \alias{clickedClusterSum}
-\title{Nearest clicked cluster}
+\title{clickedClusterSum}
 \usage{
 clickedClusterSum(corpus = NULL, e = NULL)
 }

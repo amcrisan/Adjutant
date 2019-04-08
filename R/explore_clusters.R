@@ -1,7 +1,8 @@
 #' Nearest clicked cluster
-#' @export
+#' @title clickedClusterSum
 #' @param corpus a document corpus
 #' @param e co-ordinates from mouse click
+#' @export
 clickedClusterSum<-function(corpus =NULL, e = NULL){
   
   if(!is.null(e)){
@@ -26,9 +27,10 @@ clickedClusterSum<-function(corpus =NULL, e = NULL){
 
 
 #' Print a summary statement for topic clusters
-#' @export
+#' @title clusterSummaryText
 #' @param corpus a document corpus
 #' @param clustSelected name of a cluster
+#' @export
 clusterSummaryText<-function(corpus = NULL,clustSelected=NULL){
   
   tmp <- corpus %>%
@@ -43,9 +45,10 @@ clusterSummaryText<-function(corpus = NULL,clustSelected=NULL){
 
 
 #' Top Papers for a cluster
-#' @export
+#' @title getTopPapers
 #' @param corpus a document corpus
 #' @param selectedCluster a name of cluster
+#' @export
 getTopPapers<-function(corpus=NULL,selectedCluster=NULL){
   
   
@@ -88,7 +91,6 @@ getTopPapers<-function(corpus=NULL,selectedCluster=NULL){
 
 
 #' Naming clusters
-#'
 #' @param clustPMID  PMID values for documents within the cluster
 #' @param topNVal # of top terms used to name cluster
 #' @param clustValue cluster identified, mainly used to check it unclustered 
@@ -98,26 +100,26 @@ getTopPapers<-function(corpus=NULL,selectedCluster=NULL){
 #' @return topWord : a string of top two terms for a given cluster
 #' @export
 #'
-# getTopTerms<-function(clustPMID=NULL,topNVal=1,clustValue = NA,tidyCorpus = NULL){
-#   
-#   clustValue<-clustValue[1]
-#   
-#   if(clustValue == 0)
-#     return("Not-Clustered")
-#   
-#   topWord<-tidyCorpus %>%
-#     filter(PMID %in% clustPMID) %>%
-#     ungroup() %>%
-#     group_by(wordStemmed) %>%
-#     dplyr::count() %>%
-#     ungroup()%>%
-#     arrange(-nn) %>%
-#     top_n(topNVal)
-#   
-#   # return character and collapse top terms (useful in even of a tie)
-#   topWord<-paste0(topWord$wordStemmed,collapse = "-")
-#   return(topWord)
-# }
+getTopTerms<-function(clustPMID=NULL,topNVal=1,clustValue = NA,tidyCorpus = NULL){
+
+  clustValue<-clustValue[1]
+
+  if(clustValue == 0)
+    return("Not-Clustered")
+
+  topWord<-tidyCorpus %>%
+    filter(PMID %in% clustPMID) %>%
+    ungroup() %>%
+    group_by(wordStemmed) %>%
+    dplyr::count() %>%
+    ungroup()%>%
+    arrange(-nn) %>%
+    top_n(topNVal)
+
+  # return character and collapse top terms (useful in even of a tie)
+  topWord<-paste0(topWord$wordStemmed,collapse = "-")
+  return(topWord)
+}
 
 #top terms in each cluster
 #' Get Top Terms in Each Cluster
