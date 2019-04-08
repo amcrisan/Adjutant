@@ -339,10 +339,7 @@ shinyServer(function(input, output,session) {
           mutate(tsneClusterNames = getTopTerms(clustPMID = PMID,clustValue=tsneCluster,topNVal = 2,tidyCorpus=tidyCorpus_df)) %>%
           select(PMID,tsneClusterNames) %>%
           ungroup()
-        
-        #not sure why I have to to do this..
-        clustNames[clustNames$tsneClusterNames=="Noise",]$tsneClusterNames<-"Not-Clustered"
-        
+      
         #update document corpus with cluster names
         values$corpus<-inner_join(values$corpus,clustNames,by=c("PMID","tsneCluster"))
       })
@@ -440,8 +437,6 @@ shinyServer(function(input, output,session) {
             dplyr::select(PMID,tsneClusterNames) %>%
             dplyr::ungroup()
 
-          #not sure why I have to to do this..
-          clustNames[clustNames$tsneClusterNames=="Noise",]$tsneClusterNames<-"Not-Clustered"
           
           #update document corpus with cluster names
           tmp<-inner_join(values$corpus,clustNames,by=c("PMID","tsneCluster"),suffix=c("OLD","NEW"))
