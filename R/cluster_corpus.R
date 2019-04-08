@@ -192,32 +192,6 @@ runOptPotential<-function(corpus=NULL,minPt=NULL){
     
 }
 
-
-# #a function that names clusters
-# getTopTerms<-function(clustPMID=NULL,topNVal=1,clustValue = NA,tidyCorpus = NULL){
-#   clustValue<-clustValue[1]
-#   
-#   if(clustValue == 0){
-#     return("Not-Clustered")
-#   }
-#   
-#   topWord<-tidyCorpus %>%
-#     filter(PMID %in% clustPMID) %>%
-#     ungroup() %>%
-#     group_by(wordStemmed) %>%
-#     dplyr::count() %>%
-#     ungroup()%>%
-#     arrange(-nn) %>%
-#     top_n(topNVal)
-#   
-#   # return character and collapse top terms (useful in even of a tie)
-#   topWord<-paste0(topWord$wordStemmed,collapse = "-")
-#   return(topWord)
-# }
-# 
-
-
-
 #the task of searching for the optimal parameters
 #altnerative and experimental version
 runOptPotentialAlt<-function(corpus=NULL,minPt=NULL){

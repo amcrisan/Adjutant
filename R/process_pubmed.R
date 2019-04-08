@@ -69,12 +69,39 @@ processSearch<-function(query=NULL,ncbi_key=NA,demoversion=FALSE, forceGet = TRU
     start = numVals[i]+1
     end = numVals[i + 1]
   
-
-    corpus <- rbind(corpus,formatData(pmidUnique[start:end],ncbi_key,forceGet))
-    Sys.sleep(1) #slow down the connection
+    #Sometimes, the connect drops out
+    #Handle this more elegantly
+    attempt = 1
+    tmpDat<-NULL
+    
+    while(attempt<=3){
+      tmpDat<-formatData(pmidUnique[start:end],ncbi_key,forceGet)
+      
+      if(!is.null(tmpDat)){
+        #no connection issues, jump out of loop
+        break;
+      }
+      attempt = attempt + 1;
+      
+      #sleep longer, then try again
+      Sys.sleep(10*attempt)
+    }
+    
+    #if add articles to growing corpus list
+    if(!is.null(tmpDat)){
+      corpus <- rbind(corpus,tmpDat)
+    }
+  }
+  
+  
+  #if nothing could be added warn
+  if(is.null(nrow(corpus)) | nrow(corpus) == 0){
+    warning("No articles could be retrieved - either there was an error in the search or a connection issue to NCBI")
+    return(NULL)
   }
   
   corpus<- dplyr::distinct(corpus)
+  Sys.sleep(1) #slow down the connection, avoids timeouts
   
   return(corpus)
 }
@@ -98,7 +125,15 @@ formatData<-function(ids = NULL, ncbi_key = NA, forceGet=TRUE){
       query<-paste0(tmpids,collapse = ",")
     }
     
-    pubResults<-EUtilsGet(query,type="efetch",db="pubmed")
+    pubResults<-tryCatch({EUtilsGet(query,type="efetch",db="pubmed")},
+                         error = function(err){
+                           return(NULL)
+                         })
+    
+    if(is.null(pubResults)){
+      #connection issue, do not continue
+      return(NULL)
+    }
     
     #make sure that results out = result in. EUtils 
     #its an odd fringe case, but this does actually happen

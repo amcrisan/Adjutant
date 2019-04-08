@@ -111,9 +111,9 @@ getTopTerms<-function(clustPMID=NULL,topNVal=1,clustValue = NA,tidyCorpus = NULL
     filter(PMID %in% clustPMID) %>%
     ungroup() %>%
     group_by(wordStemmed) %>%
-    dplyr::count() %>%
+    dplyr::count(name="total") %>%
     ungroup()%>%
-    arrange(-nn) %>%
+    arrange(-total) %>%
     top_n(topNVal)
 
   # return character and collapse top terms (useful in even of a tie)

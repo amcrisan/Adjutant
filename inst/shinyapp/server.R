@@ -34,6 +34,7 @@ dropNulls <- function(x) {
 
 #function to update searchInput widget. Adapted from update awesomeCheckbox
 updateSearchInput <- function (session, inputId, value = NULL) {
+
   message <- dropNulls(list(value = value))
   session$sendInputMessage(inputId, message)
 }
@@ -118,8 +119,7 @@ shinyServer(function(input, output,session) {
   # Observe if 'search' button is pushed to initate pubmed query
   observeEvent(input$searchQuery_search,{
     #search query is not null
-    if(!is.null(input$searchQuery_search) ){
-      
+    if(!is.null(input$searchQuery) ){
       #make sure that there's actually text in the search query, and not empty spaces
       if(grepl("[a-zA-Z]+",input$searchQuery)){
            withProgress(message = 'Querying Pubmed', value = 0,
@@ -140,7 +140,10 @@ shinyServer(function(input, output,session) {
             searchArgs<-searchArgs[sapply(searchArgs,function(x){!is.na(x)})]
             
             #search pubmed
-            df<-do.call(processSearch,searchArgs)
+            df<-tryCatch({do.call(processSearch,searchArgs)},
+                         error = function(err){
+                           return(NULL)
+                         })
            })
           
           if(!is.null(df)){
@@ -166,7 +169,7 @@ shinyServer(function(input, output,session) {
             sendSweetAlert(
               session = session,
               title = "Could not get PubMed results",
-              text = "Adjutant could not retrieve PubMed results. It's likely that there was  a problem with your Internet connection (including your firewall settings). Please check your internet connection and try your search again.",
+              text = "Adjutant could not retrieve PubMed results. It's likely that there wasa problem with your Internet connection (including your firewall settings). Also NCBI limits the number of requests from a single IP, it can help to get an NCBI API key (see Adjutant's online repo for details).",
               type = "error"
             )
           }
@@ -528,14 +531,17 @@ shinyServer(function(input, output,session) {
       }
     
     #now sampling
+    updateNumericInput(session,"filtSampleSizeChoice",value=nrow(datSub))
     
     if(input$sampChoices == "random"){
+      samp_size<-min(nrow(datSub),input$filtSampleSizeChoice)
+      
       if(input$sampleWeight !="none"){
         datSub<-datSub %>%
-          sample_n(size=input$filtSampleSizeChoice,weight=sampWeight)
+          sample_n(size=samp_size,weight=sampWeight)
       }else{
         datSub<-datSub %>%
-          sample_n(size=input$filtSampleSizeChoice)
+          sample_n(size=samp_size)
       }
       
     }else if(input$sampChoices == "randomStratified"){
@@ -575,6 +581,7 @@ shinyServer(function(input, output,session) {
           unnest()
       }    
     }else if(input$sampChoices == "ranked"){
+      
       datSub <- datSub %>%
         filter(pmcCitationCount>0)%>%
         top_n(input$filtSampleSizeChoice,pmcCitationCount)
