@@ -35,7 +35,7 @@ body<-dashboardBody(
         tabPanel("Enter Query",
           br(),
           actionLink("loadExample",HTML("<small>Load an example query</small>")),
-          searchInput(
+          shinyWidgets::searchInput(
               inputId = "searchQuery", 
               label = NULL, 
               placeholder = "Enter a PubMed search string here...", 

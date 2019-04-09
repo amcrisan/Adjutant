@@ -35,13 +35,12 @@ tidyCorpus<- function(corpus=NULL){
     select(PMID,word,wordStemmed)
 
   #Calculate TF IDF
-  #withProgress(message = 'Calculating TD_IDF metric', value = 0.1, { 
   # I will now also add the term frequency document frequency values.
   tidyCorpus_df<-tidyCorpus_df %>%
     dplyr::count(PMID, wordStemmed,sort = TRUE) %>%
     ungroup() %>%
     bind_tf_idf(wordStemmed, PMID, n)
-  #})
+
   
   ##Cleaning up terms
   # removing terms that are really really common & those that are very infrequent
@@ -49,13 +48,13 @@ tidyCorpus<- function(corpus=NULL){
   totalArticles<-nrow(corpus)
   
   #TO DO: Hard criteria, could be done more empirically
+  #Instances of words *per article*
   wordToRemove<-tidyCorpus_df %>%
-    group_by(wordStemmed) %>%
-    dplyr::count() %>%
-    filter(nn < totalArticles*0.01 | nn > totalArticles*0.7) 
+    dplyr::group_by(wordStemmed) %>%
+    dplyr::count(name="total")%>%
+    dplyr::filter(total < totalArticles*0.01 | total > totalArticles*0.7) 
   
   tidyCorpus_df<-anti_join(tidyCorpus_df,wordToRemove,by="wordStemmed")
-  #})
   
   return(tidyCorpus_df)
 }
