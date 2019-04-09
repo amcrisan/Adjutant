@@ -135,9 +135,9 @@ topClustTerms<-function(corpus = NULL,corpusTidy=NULL,selectedCluster = NULL){
     df<-corpusTidy %>%
       filter(PMID %in% pmids$PMID) %>% 
       group_by(wordStemmed) %>%
-      dplyr::count()%>%
+      dplyr::count(name="total")%>%
       ungroup()%>%
-      mutate(freq = nn/nrow(pmids)) %>%
+      mutate(freq = total/nrow(pmids)) %>%
       arrange(-freq) %>% 
       top_n(10)
     
