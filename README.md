@@ -73,11 +73,11 @@ devtools::install_github("amcrisan/Adjutant")
 
 ### NCBI API Key
 
-NCBI is limiting the amount of requests its servers handle from a single API address, when using Adjutant this often manifests as a connection error. I've added some functionality into Adjutant that limits how often it queries Pubmed each second, but if you register for an API key you may connection issues.
+NCBI is limiting the amount of requests its servers handle from a single API address, when using Adjutant this often manifests as a connection error. I've added some functionality into Adjutant that limits how often it queries Pubmed each second, but if you register for an API key you may encounter fewer connection issues.
 
 If it pretty straight forward to get an NCBI API key, you can follow the [online instructions](https://ncbiinsights.ncbi.nlm.nih.gov/2017/11/02/new-api-keys-for-the-e-utilities/).
 
-You can use your the NCBI API key with Adjutant when using the shiny application or when using the command line functions. Adjutant will automatically append the NCBI API key to your search. You can use Adjutant without an API key, but you might run into more connection problems.
+You can use your the NCBI API key with Adjutant when using the shiny application or when using the command line functions. Adjutant will automatically append the NCBI API key to your search. You can use Adjutant without an API key, but you might run into connection problems.
 
 
 
