@@ -175,7 +175,7 @@ If you use hdbscan through Adjutant, the result will be the Adjuntant optimized 
 optClusters <- optimalParam(df)
 
 #add the new cluster ID's the running dataset
-df<-inner_join(df,optClusters,by="PMID") %>%
+df<-inner_join(df,optClusters$retItems,by="PMID") %>%
     mutate(tsneClusterStatus = ifelse(tsneCluster == 0, "not-clustered","clustered"))
 
 # plot the HDBSCAN clusters (no names yet)
