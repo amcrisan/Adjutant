@@ -8,7 +8,7 @@
 #' @import httr
 #' @return
 #' @export
-processScholarSearch<-function(query =NULL,query_max=20000){
+processScholarSearch<-function(query =NULL,query_max=40000,total_pages = 1000){
   
   article_total <- 0
 
@@ -41,11 +41,11 @@ processScholarSearch<-function(query =NULL,query_max=20000){
   stop_count<-0
   res<-c()
   
-  while(article_total < query_max || stop_count > 100){
+  while(article_total < query_max & stop_count < query_max & page_count< totalPages){
     
     #body of post request
     post_request<-list(queryString="data science",
-         page=page_count,
+         page=10,
          pageSize=1000,
          sort="relevance",
          authors=list(),
@@ -66,13 +66,14 @@ processScholarSearch<-function(query =NULL,query_max=20000){
               verbose())
     
     if(paper_data$status_code != 200){
-      stop("Seomthing went wrong getting data from semnatic scholar")
+      stop("Something went wrong getting data from semnatic scholar")
     }
     
    
     #just do this once
     if(page_count == 1){
       total_papers<-content(paper_data)$totalResults
+      total_pages<-content(paper_data)$totalPages
       if(total_papers < query_max){
         query_max<-total_papers
       }
@@ -101,11 +102,28 @@ processScholarSearch<-function(query =NULL,query_max=20000){
                              doi = paper_data_results[[1]]$primaryPaperLink$url,
                              stringsAsFactors = FALSE)
       
-      article_total<-article_total + length(paper_data_results)
-      page_count<-page_count + 1
-      stop_count<-stop_count+1
-      
       res<-rbind(res,risResults)
+      
+      #for some reson, there are duplicated
+      #that are tricky to pick out
+      #so, keep only unique ids
+      res<-res %>%
+        group_by(PMID)%>%
+        sample_n(1)%>%
+        ungroup()
+       
+    }
+    
+    article_total<- nrow(res)
+    page_count<-page_count + 1
+    stop_count<-stop_count+1
+    
+    print(page_count)
+    
+    if(page_count%%100 == 0){
+     Sys.sleep(10)
     }
   }
+  
+  return(res)
 }
