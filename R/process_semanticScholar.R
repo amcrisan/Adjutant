@@ -3,19 +3,18 @@
 #' Method that will also explore Semantic Scholar Articles
 #' @param query 
 #' @import rvest
-#' @import magrittr
-#' @import jsonlite
+#' @import dplyr
 #' @import httr
 #' @return
 #' @export
-processScholarSearch<-function(query =NULL,query_max=40000,total_pages = 1000){
+processScholarSearch<-function(query =NULL,query_max=40000,totalPages = 1000){
   
   article_total <- 0
 
   
   #useful " https://open.semanticscholar.org/
   #query<-"(outbreak OR epidemic OR pandemic) AND genom*"
-  query<-"data science"
+  query<-'"data science"'
   
   site<-"https://www.semanticscholar.org/"
   session<- html_session(site)
@@ -45,15 +44,15 @@ processScholarSearch<-function(query =NULL,query_max=40000,total_pages = 1000){
     
     #body of post request
     post_request<-list(queryString="data science",
-         page=10,
-         pageSize=1000,
+         page=page_count,
+         pageSize=10,
          sort="relevance",
          authors=list(),
          coAuthors=list(),
          venues=list(),
-         yearFilter=list(min=2014,max=2015),
+         yearFilter=list(min=2014,max=2019),
          requireViewablePdf=TRUE,
-         publicationTypes=list(),
+         publicationTypes=list("Reviews"),
          externalContentTypes=list())
   
   
@@ -99,12 +98,13 @@ processScholarSearch<-function(query =NULL,query_max=40000,total_pages = 1000){
                              language = "eng",
                              pmcCitationCount = paper_data_results[[i]]$citationStats$numCitations,
                              pmcID = paper_data_results[[i]]$id,
-                             doi = paper_data_results[[1]]$primaryPaperLink$url,
+                             doi = ifelse(is.null(paper_data_results[[i]]$primaryPaperLink$url),NA,
+                                      paper_data_results[[i]]$primaryPaperLink$url),
                              stringsAsFactors = FALSE)
       
       res<-rbind(res,risResults)
       
-      #for some reson, there are duplicated
+      #for some reson, there are duplicated ids
       #that are tricky to pick out
       #so, keep only unique ids
       res<-res %>%
@@ -120,7 +120,7 @@ processScholarSearch<-function(query =NULL,query_max=40000,total_pages = 1000){
     
     print(page_count)
     
-    if(page_count%%100 == 0){
+    if(page_count%%500 == 0){
      Sys.sleep(10)
     }
   }
