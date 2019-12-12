@@ -4,8 +4,13 @@
 \alias{processSearch}
 \title{Processing PubMed Search}
 \usage{
-processSearch(query = NULL, ncbi_key = NA, demoversion = FALSE,
-  forceGet = TRUE, ...)
+processSearch(
+  query = NULL,
+  ncbi_key = NA,
+  demoversion = FALSE,
+  forceGet = TRUE,
+  ...
+)
 }
 \arguments{
 \item{query}{query for PubMed search}

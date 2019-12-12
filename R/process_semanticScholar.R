@@ -2,19 +2,36 @@
 #' Process Scholar Search
 #' Method that will also explore Semantic Scholar Articles
 #' @param query 
+#' @param query_max
+#' @param totalPages
+#' @param yearMin
+#' @param yearMax
+#' @param PublicationType
+#' @param requirePDF
+#' @param sortResults
 #' @import rvest
 #' @import dplyr
 #' @import httr
+#' @import jsonlite
+#' @import magrittr
 #' @return
 #' @export
-processScholarSearch<-function(query =NULL,query_max=40000,totalPages = 1000){
+processScholarSearch<-function(query =NULL,
+                               query_max=40000,
+                               totalPages = 1000,
+                               yearMin = NULL,
+                               yearMax = NULL,
+                               publicationTypes = list(),
+                               requirePDF = TRUE,
+                               sortResults = "relevance"){
+  
+  yearMax<-ifelse(is.null(yearMax), format(Sys.Date(),"%Y"),yearMax)
+  yearMin<-ifelse(is.null(yearMin),"1900",yearMin)
+  
+  years<-list(min=as.numeric(yearMin),max=as.numeric(yearMax))
   
   article_total <- 0
 
-  
-  #useful " https://open.semanticscholar.org/
-  #query<-"(outbreak OR epidemic OR pandemic) AND genom*"
-  query<-'"data science"'
   
   site<-"https://www.semanticscholar.org/"
   session<- html_session(site)
@@ -50,19 +67,15 @@ processScholarSearch<-function(query =NULL,query_max=40000,totalPages = 1000){
          authors=list(),
          coAuthors=list(),
          venues=list(),
-         yearFilter=list(min=2014,max=2019),
-         requireViewablePdf=TRUE,
-         publicationTypes=list("Reviews"),
+         yearFilter=years,
+         requireViewablePdf=requirePDF,
+         publicationTypes=publicationTypes,
          externalContentTypes=list())
-  
-  
 
     #getting paper data
     paper_data<-POST("https://www.semanticscholar.org/api/1/search",
               content_type('application/json'),
-              #body='{"queryString":"data science","page":1,"pageSize":100,"sort":"relevance","authors":[],"coAuthors":[],"venues":[],"yearFilter":{"min":2014,"max":2019},"requireViewablePdf":true,"publicationTypes":[],"externalContentTypes":[]}',
-              body = jsonlite::toJSON(post_request,auto_unbox = TRUE),
-              verbose())
+              body = jsonlite::toJSON(post_request,auto_unbox = TRUE))
     
     if(paper_data$status_code != 200){
       stop("Something went wrong getting data from semnatic scholar")
@@ -117,9 +130,7 @@ processScholarSearch<-function(query =NULL,query_max=40000,totalPages = 1000){
     article_total<- nrow(res)
     page_count<-page_count + 1
     stop_count<-stop_count+1
-    
-    print(page_count)
-    
+
     if(page_count%%500 == 0){
      Sys.sleep(10)
     }

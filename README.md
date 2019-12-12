@@ -218,7 +218,7 @@ clusterNames <- df %>%
   dplyr::group_by(tsneClusterNames) %>%
   dplyr::summarise(medX = median(tsneComp1),
                    medY = median(tsneComp2)) %>%
-  dplyr::filter(tsneClusterNames != "Noise")
+  dplyr::filter(tsneClusterNames != "Not-Clustered")
 
 ggplot(df,aes(x=tsneComp1,y=tsneComp2,group=tsneClusterNames))+
   geom_point(aes(colour = tsneClusterStatus),alpha=0.2)+

@@ -4,8 +4,7 @@
 \alias{topClustTerms}
 \title{Get Top Terms in Each Cluster}
 \usage{
-topClustTerms(corpus = NULL, corpusTidy = NULL,
-  selectedCluster = NULL)
+topClustTerms(corpus = NULL, corpusTidy = NULL, selectedCluster = NULL)
 }
 \arguments{
 \item{corpus}{a document corpus}
