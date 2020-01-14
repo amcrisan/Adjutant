@@ -5,7 +5,8 @@
     * [Important Adjutant Details](#adjutant-inner-workings)
 2. [Download](#download)
     * [Getting an NCBI API Key](#ncbi-api-key)
-3. [Demo](#demo)
+3. [Latest New](#latest-news)
+4. [Demo](#demo)
     * [Using the Adjuntant Shiny App](#using-the-adjuntant-shiny-app)
     * [Using Adjutant within a R script](#using-adjutant-within-a-R-script)
 
@@ -86,7 +87,7 @@ See a history of all the news in NEWS.txt.
 2020/14/01 : New Beta Features
 Some new features that have been sitting in the dev branch have now been merged to the main branch. These featuers are:
 
-* the ability to search semnatic scholar : process_ScholarSearch 
+* the ability to search semantic scholar : process_ScholarSearch 
 
 * use adjutant's commands with an existing data frame or text file : processsSingleFile
 
@@ -94,7 +95,7 @@ Some new features that have been sitting in the dev branch have now been merged 
 
 * add custom stop words to tidy corpus cleaning
 
-All of these beta featuers are on the command line only, not changes to the UI yet.
+All of these beta features are on the command line only, not changes to the UI yet.
 
 Some things in the pipe that dedicated Adjutant users might have some fun with are exploring the replacement of t-SNE with UMAP (should speed things up). Also looking to update the UI, but still working on the right direction.
 
