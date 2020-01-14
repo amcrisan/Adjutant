@@ -80,6 +80,24 @@ If it pretty straight forward to get an NCBI API key, you can follow the [online
 You can use your the NCBI API key with Adjutant when using the shiny application or when using the command line functions. Adjutant will automatically append the NCBI API key to your search. You can use Adjutant without an API key, but you might run into connection problems.
 
 
+## Latest News
+See a history of all the news in NEWS.txt. 
+
+2020/14/01 : New Beta Features
+Some new features that have been sitting in the dev branch have now been merged to the main branch. These featuers are:
+
+* the ability to search semnatic scholar : process_ScholarSearch 
+
+* use adjutant's commands with an existing data frame or text file : processsSingleFile
+
+* speeded up for tidying the data corpus
+
+* add custom stop words to tidy corpus cleaning
+
+All of these beta featuers are on the command line only, not changes to the UI yet.
+
+Some things in the pipe that dedicated Adjutant users might have some fun with are exploring the replacement of t-SNE with UMAP (should speed things up). Also looking to update the UI, but still working on the right direction.
+
 
 ## Demo
 
@@ -218,7 +236,7 @@ clusterNames <- df %>%
   dplyr::group_by(tsneClusterNames) %>%
   dplyr::summarise(medX = median(tsneComp1),
                    medY = median(tsneComp2)) %>%
-  dplyr::filter(tsneClusterNames != "Noise")
+  dplyr::filter(tsneClusterNames != "Not-Clustered")
 
 ggplot(df,aes(x=tsneComp1,y=tsneComp2,group=tsneClusterNames))+
   geom_point(aes(colour = tsneClusterStatus),alpha=0.2)+

@@ -4,10 +4,12 @@
 \alias{tidyCorpus}
 \title{Tidying Up the PubMed Corpus}
 \usage{
-tidyCorpus(corpus = NULL)
+tidyCorpus(corpus = NULL, stopTerms = NULL)
 }
 \arguments{
 \item{corpus}{a document corpus}
+
+\item{stopTerms}{stop terms provided by the user}
 }
 \value{
 Tidy Text Corpus
