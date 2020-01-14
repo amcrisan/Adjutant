@@ -2,6 +2,7 @@
 #'
 #' @description Creates a tidytext corpus from the PubMed articles titles and abstracts. Adjutant generally follows the approach presented in  'Text Mining with R' (https://www.tidytextmining.com/tidytext.html). 
 #' @param corpus a document corpus
+#' @param stopTerms stop terms provided by the user
 #'
 #' @return Tidy Text Corpus
 #' @import tidytext
@@ -13,7 +14,7 @@
 #' 
 #' @export
 #'
-tidyCorpus<- function(corpus=NULL){
+tidyCorpus<- function(corpus=NULL, stopTerms = NULL){
   #data(stop_words,envir = environment())
   if (requireNamespace("tidytext", quietly = TRUE)) {
     stop_words<-tidytext::stop_words
@@ -21,6 +22,16 @@ tidyCorpus<- function(corpus=NULL){
   
   #remove some common terms that will occur in abstract
   customStopTerms<-data.frame(word=c("abstract", "text", "abstracttext","introduction","background","method","methods","methodology","conclusion","conclusions","objectives","results","result","we","materials","purpose","significance","significant","mg","http","com"))
+  
+  surveyWords <- c("abstract", "abstracttext","introduction","background","method","methods","methodology","conclusion","conclusions","objectives","results","result","we","materials","purpose","significance","significant","mg","http","com")
+  
+  if(!is.null(stopTerms)){
+    customStopTerms = data.frame(word = c(stopTerms,surveyWords))
+  }else{
+    customStopTerms<-data.frame(word= surveyWords)
+    
+  }
+
   
   # Make text tidy!
   # Note: latest version of tidyr::unnest is now very slow.

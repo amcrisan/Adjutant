@@ -4,7 +4,8 @@
 \alias{getTopTerms}
 \title{Naming clusters}
 \usage{
-getTopTerms(clustPMID = NULL, topNVal = 1, clustValue = NA, tidyCorpus = NULL)
+getTopTerms(clustPMID = NULL, topNVal = 1, clustValue = NA,
+  tidyCorpus = NULL)
 }
 \arguments{
 \item{clustPMID}{PMID values for documents within the cluster}

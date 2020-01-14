@@ -5,22 +5,13 @@
 \title{Process Scholar Search
 Method that will also explore Semantic Scholar Articles}
 \usage{
-processScholarSearch(
-  query = NULL,
-  query_max = 40000,
-  totalPages = 1000,
-  yearMin = NULL,
-  yearMax = NULL,
-  publicationTypes = list(),
-  requirePDF = TRUE,
-  sortResults = "relevance"
-)
+processScholarSearch(query = NULL, query_max = 40000,
+  totalPages = 1000, yearMin = NULL, yearMax = NULL,
+  publicationTypes = list(), requirePDF = TRUE,
+  sortResults = "relevance")
 }
 \arguments{
 \item{query}{}
-}
-\value{
-
 }
 \description{
 Process Scholar Search
