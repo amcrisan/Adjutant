@@ -148,7 +148,7 @@ formatData<-function(ids = NULL, ncbi_key = NA, forceGet=TRUE){
     
     #convert author list from list object to string obeject with author names seperated by ;
     authors<-sapply(pubResults@Author,function(x){
-      apply(x,1,function(y){sprintf("%s, %s",y[1],y[2])}) %>% paste0(.,collapse=";")
+      apply(x,1,function(y){sprintf("%s, %s",y[2],y[3])}) %>% paste0(.,collapse=";")
     })
     
     #also convert mesh Terms from a list
