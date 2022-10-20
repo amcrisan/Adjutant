@@ -191,7 +191,7 @@ formatData<-function(ids = NULL, ncbi_key = NA, forceGet=TRUE){
     #putting all the data together into a data frame
     risResults<-data.frame(PMID=pubResults@PMID,
                      YearPub=pubResults@YearPubmed,
-                     Journal=pubResults@Title,
+                     Journal=pubResults@ISOabbreviation,
                      Authors=authors,
                      Title=pubResults@ArticleTitle,
                      Abstract=pubResults@AbstractText,
